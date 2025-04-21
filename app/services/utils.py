@@ -36,3 +36,10 @@ def delete_converation_cache():
     if os.path.exists(DATA_STORE):
         with open(DATA_STORE, 'w') as f:
             json.dump({}, f)
+
+def read_kb_file() -> str:
+    kb_file_path = DATA_STORE + '/kb.txt'
+    if os.path.exists(kb_file_path):
+        with open(kb_file_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    return ""
