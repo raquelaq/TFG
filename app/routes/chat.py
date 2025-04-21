@@ -31,7 +31,7 @@ async def handle_message(request: Request):
     # Respuesta rápida estoy pensando
 
     # Validar el token de autorización para confirmar que se llama desde el proyecto de ticketing
-    validate_token(request)
+    # validate_token(request)
 
     try:
 
