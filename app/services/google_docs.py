@@ -6,6 +6,8 @@ SCOPES = ['https://www.googleapis.com/auth/documents', 'https://www.googleapis.c
 
 def read_google_doc(doc_id: str) -> str:
     try:
+        print(GOOGLE_PRIVATE_KEY)
+        print(GOOGLE_CLIENT_EMAIL)
         credentials = service_account.Credentials.from_service_account_info({
             "private_key": GOOGLE_PRIVATE_KEY,
             "client_email": GOOGLE_CLIENT_EMAIL,
