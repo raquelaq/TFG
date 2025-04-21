@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from ..services.gemini import call_gemini_llm
 from ..services.google_docs import read_google_doc
 from ..services.jira import create_jira_ticket
-from ..services.utils import convert_markdown_for_google_chat, get_conversation, save_conversation,delete_converation_cache, read_kb_file
+from ..services.utils import convert_markdown_for_google_chat, get_conversation, save_conversation,delete_converation_cache, read_kb_file, write_kb_file
 from ..config import ID_DRIVE_KB, AUDIENCE
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -19,7 +19,6 @@ async def delete_cache(request: Request):
         print("ERROR: ", str(e))
         return {"message": "Error deleting cache"}
     
-
 @router.post("/reload_kb")
 async def reload_kb(request: Request):
     try:
@@ -28,10 +27,8 @@ async def reload_kb(request: Request):
 
         if not new_kb_content:
             return {"message": "No content provided to update the knowledge base."}
-
-        # Write the content to kb.txt, creating the file if it doesn't exist
-        with open("kb.txt", "w", encoding="utf-8") as kb_file:
-            kb_file.write(new_kb_content)
+        
+        write_kb_file(new_kb_content)
 
         return {"message": "Knowledge base updated successfully."}
     

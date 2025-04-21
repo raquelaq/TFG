@@ -43,3 +43,8 @@ def read_kb_file() -> str:
         with open(kb_file_path, 'r', encoding='utf-8') as f:
             return f.read()
     return ""
+
+def write_kb_file(content: str):
+    kb_file_path = DATA_STORE + '/kb.txt'
+    with open(kb_file_path, 'w', encoding='utf-8') as f:
+        f.write(content)
