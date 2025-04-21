@@ -54,4 +54,4 @@ jobs:
 
       - name: Actualizar versión en ECS
         run: |
-          aws ecs update-service --cluster Soportia --service Soportia --task-definition Soportia --force-new-deployment
+          aws ecs update-service --cluster SoportIA --service SoportIA --task-definition SoportIA --force-new-deployment
