@@ -1,0 +1,7 @@
+__pycache__
+*.zip
+*.log
+*.ini
+*.pem
+*.json
+.vscode
