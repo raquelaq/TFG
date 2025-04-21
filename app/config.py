@@ -15,7 +15,7 @@ if os.path.exists('config.ini'):
     JIRA_AUTH_HEADER = config.get("GENERAL", "JIRA_AUTH_HEADER")  
 
 else:
-    JIRA_AUTH_HEADER = os.getenv("DATA_STORE")
+    DATA_STORE = os.getenv("DATA_STORE")
     GOOGLE_CLIENT_EMAIL = os.getenv("GOOGLE_CLIENT_EMAIL")
     GOOGLE_PRIVATE_KEY = os.getenv("GOOGLE_PRIVATE_KEY").replace('\\n', '\n')
     AUDIENCE = os.getenv("AUDIENCE")
