@@ -14,7 +14,7 @@ def convert_markdown_for_google_chat(text: str) -> str:
 
 def get_conversation(chat_id: str):
     if os.path.exists(DATA_STORE):
-        with open(DATA_STORE, 'r') as f:
+        with open(DATA_STORE + 'conversation_store.json', 'r') as f:
             try:
                 data = json.load(f)
             except json.JSONDecodeError:
@@ -24,27 +24,28 @@ def get_conversation(chat_id: str):
 
 def save_conversation(chat_id: str, conversation):
     if os.path.exists(DATA_STORE):
-        with open(DATA_STORE, 'r') as f:
+        with open(DATA_STORE + 'conversation_store.json', 'r') as f:
             data = json.load(f)
     else:
         data = {}
     data[chat_id] = conversation
-    with open(DATA_STORE, 'w') as f:
+    with open(DATA_STORE + 'conversation_store.json', 'w') as f:
         json.dump(data, f)
 
 def delete_converation_cache():
     if os.path.exists(DATA_STORE):
-        with open(DATA_STORE, 'w') as f:
+        with open(DATA_STORE + 'conversation_store.json', 'w') as f:
             json.dump({}, f)
 
-def read_kb_file() -> str:
-    kb_file_path = DATA_STORE + '/kb.txt'
+def read_kb_file() -> str:    
+    kb_file_path = DATA_STORE + 'kb.txt'
     if os.path.exists(kb_file_path):
         with open(kb_file_path, 'r', encoding='utf-8') as f:
             return f.read()
     return ""
 
 def write_kb_file(content: str):
-    kb_file_path = DATA_STORE + '/kb.txt'
+    print(DATA_STORE + 'kb.txt')
+    kb_file_path = DATA_STORE + 'kb.txt'
     with open(kb_file_path, 'w', encoding='utf-8') as f:
         f.write(content)
