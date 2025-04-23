@@ -1,6 +1,7 @@
 
 import os
 from configparser import ConfigParser
+import json
 
 if os.path.exists('config.ini'):
     config = ConfigParser()
@@ -22,3 +23,11 @@ else:
     ID_DRIVE_KB = os.getenv("GOOGLE_CLIENT_EMAIL")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     JIRA_AUTH_HEADER = os.getenv("JIRA_AUTH_HEADER")
+
+
+if os.path.exists("api_keys.json"):
+    with open("api_keys.json", "r") as f:
+        API_KEYS = json.load(f)
+
+else:
+    API_KEYS = json.load(os.getenv("API_KEYS"))

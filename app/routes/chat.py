@@ -1,26 +1,29 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Header, HTTPException
 from ..services.gemini import call_gemini_llm
 from ..services.google_docs import read_google_doc
 from ..services.jira import create_jira_ticket
-from ..services.utils import convert_markdown_for_google_chat, get_conversation, save_conversation,delete_converation_cache, read_kb_file, write_kb_file
-from ..config import ID_DRIVE_KB, AUDIENCE
+from ..services.utils import *
+from ..config import *
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from datetime import datetime 
 
+
+
 router = APIRouter()
 
 @router.get("/delete_cache")
-async def delete_cache(request: Request):
-    try:        
+async def delete_cache(request: Request, api_key_info: dict = Depends(api_key_guard)):
+    # try:
+
         delete_converation_cache()
         return {"message": "Cache deleted"}
-    except Exception as e:
-        print("ERROR: ", str(e))
-        return {"message": "Error deleting cache"}
+    # except Exception as e:
+    #     print("ERROR: ", str(e))
+    #     return {"message": "Error deleting cache"}
     
 @router.post("/reload_kb")
-async def reload_kb(request: Request):
+async def reload_kb(request: Request, api_key_info: dict = Depends(api_key_guard)):
     try:
         data = await request.json()
         new_kb_content = data.get("content", "")
@@ -37,23 +40,26 @@ async def reload_kb(request: Request):
         return {"message": "Error updating the knowledge base."}
 
 @router.post("/message")
-async def handle_message(request: Request):
-
-    # Imprimir request
-    # print("1 - Request Body:", await request.json())
-    # print("2 - Request Headers:", request.headers)
-    # print("3 - Request URL:", request.url)
-
-    # Respuesta rápida estoy pensando
-
-    # Validar el token de autorización para confirmar que se llama desde el proyecto de ticketing
-    # validate_token(request)
-
+async def handle_message(request: Request, authorization: str = Header(None)):
     try:
+
+        # Step 1: Validate token
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing or invalid token")
+
+        token = authorization.split(" ")[1]
+        claims = verify_google_chat_token(token, expected_audience="974882915974")
+        if not claims:
+            raise HTTPException(status_code=401, detail="Invalid Google token")
 
         data = await request.json()
         user_message = data.get("message", {}).get("text")
         chat_id = data.get("space", {}).get("name")
+
+        allowed_space_ids = {"spaces/pcrj58AAAAE"}  # Replace with your own space ID(s)
+        space_id = data.get("space", {}).get("name")
+        if space_id not in allowed_space_ids:
+            raise HTTPException(status_code=403, detail="Unauthorized space")
 
         conversation = get_conversation(chat_id)
         if not conversation:
@@ -128,29 +134,5 @@ async def handle_message(request: Request):
             "text": "Lo siento, ha ocurrido un error y no puedo ayudarte ahora mismo."
         }
 
-def validate_token(request):
 
-    # Bearer Tokens received by apps will always specify this issuer.
-    CHAT_ISSUER = 'chat@system.gserviceaccount.com'
 
-    try:
-
-        # Obtener el token del header Authorization
-        authorization = request.headers.get("Authorization", "")
-        if not authorization.startswith("Bearer "):
-            print('No Bearer token found')
-            return False
-
-        bearer = authorization.split("Bearer ")[1]
-        print('TOKEN: ' + bearer)
-
-        # Verify valid token, signed by CHAT_ISSUER, intended for a third party.
-        request = google_requests.Request()
-        token = id_token.verify_oauth2_token(bearer, request, AUDIENCE)
-        print('EMAIL: ' + token['email'])
-
-        return token['email'] == CHAT_ISSUER
-
-    except Exception as e:
-        print('ERROR: ' + str(e))
-        return False
