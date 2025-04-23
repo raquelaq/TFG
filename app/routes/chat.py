@@ -9,7 +9,6 @@ from google.auth.transport import requests as google_requests
 from datetime import datetime 
 
 
-
 router = APIRouter()
 
 @router.get("/delete_cache")
