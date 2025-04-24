@@ -55,11 +55,6 @@ async def handle_message(request: Request, authorization: str = Header(None)):
         user_message = data.get("message", {}).get("text")
         chat_id = data.get("space", {}).get("name")
 
-        allowed_space_ids = ["spaces/pcrj58AAAAE", "spaces/6qmig8AAAAE"]  # Replace with your own space ID(s)
-        space_id = data.get("space", {}).get("name")
-        print(space_id)
-        if space_id not in allowed_space_ids:
-            raise HTTPException(status_code=403, detail="Unauthorized space")
 
         conversation = get_conversation(chat_id)
         if not conversation:
