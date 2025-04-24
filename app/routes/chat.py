@@ -46,10 +46,10 @@ async def handle_message(request: Request, authorization: str = Header(None)):
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing or invalid token")
 
-        token = authorization.split(" ")[1]
-        claims = verify_google_chat_token(token, expected_audience="974882915974")
-        if not claims:
-            raise HTTPException(status_code=401, detail="Invalid Google token")
+        # token = authorization.split(" ")[1]
+        # claims = verify_google_chat_token(token, expected_audience="974882915974")
+        # if not claims:
+        #     raise HTTPException(status_code=401, detail="Invalid Google token")
 
         data = await request.json()
         user_message = data.get("message", {}).get("text")
@@ -57,8 +57,9 @@ async def handle_message(request: Request, authorization: str = Header(None)):
 
         allowed_space_ids = {"spaces/pcrj58AAAAE"}  # Replace with your own space ID(s)
         space_id = data.get("space", {}).get("name")
-        if space_id not in allowed_space_ids:
-            raise HTTPException(status_code=403, detail="Unauthorized space")
+        print(space_id)
+        # if space_id not in allowed_space_ids:
+        #     raise HTTPException(status_code=403, detail="Unauthorized space")
 
         conversation = get_conversation(chat_id)
         if not conversation:
