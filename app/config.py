@@ -30,4 +30,6 @@ if os.path.exists("api_keys.json"):
         API_KEYS = json.load(f)
 
 else:
-    API_KEYS = json.load(os.getenv("API_KEYS"))
+    API_KEYS = json.loads(os.getenv("API_KEYS", "{}"))
+
+
