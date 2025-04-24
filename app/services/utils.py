@@ -93,10 +93,18 @@ def cert_to_public_key(cert_str):
     cert_obj = load_pem_x509_certificate(cert_str.encode(), default_backend())
     return cert_obj.public_key()
 
-def verify_google_chat_token(token: str, expected_audience: str):
+def verify_google_chat_token(token: str, expected_audience: list[str]):
     try:
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header["kid"]
+
+        # Extraemos el payload sin verificar la firma, solo para inspeccionar
+        unverified_payload = jwt.decode(token, options={"verify_signature": False})
+        aud = unverified_payload.get("aud")
+
+        if aud not in expected_audience:
+            print(f"❌ Audience '{aud}' not in expected list")
+            return None
 
         certs = get_google_chat_certificates()
         if kid not in certs:
@@ -106,15 +114,17 @@ def verify_google_chat_token(token: str, expected_audience: str):
         cert_str = certs[kid]
         public_key = cert_to_public_key(cert_str)
 
+        # Verificamos ahora con firma y parámetros completos
         payload = jwt.decode(
             token,
             public_key,
             algorithms=["RS256"],
-            audience=expected_audience,
+            audience=aud,  # ya lo filtramos arriba
             issuer="chat@system.gserviceaccount.com",
             leeway=60
         )
         return payload
+
     except jwt.ExpiredSignatureError:
         print("❌ Token expired")
     except jwt.InvalidTokenError as e:
@@ -122,4 +132,5 @@ def verify_google_chat_token(token: str, expected_audience: str):
     except Exception as ex:
         print(f"❌ Error verifying token: {ex}")
     return None
+
 #######################################################
