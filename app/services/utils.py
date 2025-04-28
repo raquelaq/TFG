@@ -3,6 +3,8 @@ import json
 import os
 from datetime import datetime 
 from ..config import *
+from ..services.gemini import *
+
 
 from fastapi import Request, Header, HTTPException, Depends
 
@@ -134,3 +136,50 @@ def verify_google_chat_token(token: str, expected_audience: list[str]):
     return None
 
 #######################################################
+
+
+
+async def create_ticket_contents(messages):
+    prompt = f"""A partir de los siguientes mensajes entre un chat de soporte y un usuario
+crea un título corto descriptivo del problema que el usuario está teniendo, para crear un ticket con él.
+Además, crea un resumen en el que se explique en detalle el problema del usuario para facilitar al trabajador de soporte
+entender el problema del usuario.
+Asegúrate de responder en formato JSON, usando los campos "title" y "summary".
+
+Ejemplo:
+{{
+  "title": "Problemas conectando con Sigrid",
+  "summary": "El usuario está encontrando problemas a la hora de conectarse con Sigrid. El error que está dando es el 408. Intentó acceder ignorando el firewall y el problema persiste."
+}}
+
+Base tus respuestas únicamente en el último problema de la siguiente conversación:
+\"\"\"{json.dumps(messages)}\"\"\"
+"""
+
+    tools = [
+        {
+            "function_declarations": [
+                {
+                    "name": "return_json_response",
+                    "description": "Devuelve una respuesta como JSON con los campos 'title' y 'summary'",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string",
+                                "description": "Título breve basado en la conversación."
+                            },
+                            "summary": {
+                                "type": "string",
+                                "description": "Resumen detallado del problema del usuario."
+                            }
+                        },
+                        "required": ["title", "summary"]
+                    }
+                }
+            ]
+        }
+    ]
+
+    parsed_reply = await call_gemini_prompt(prompt, tools)
+    return parsed_reply
