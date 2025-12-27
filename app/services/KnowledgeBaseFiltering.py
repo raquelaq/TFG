@@ -111,15 +111,16 @@ def reset_conversation_context(user_email: str = None):
 
 # --- Core Loading Function for FastAPI Startup ---
 
-def initialize_model_and_kb(Route):
+def initialize_model_and_kb(Route, force_reload=False):
 
-    global model, KB_CORPUS_EMBEDDINGS, KB_CORPUS_DATA
-    global _model_initialized
+    global model, KB_CORPUS_EMBEDDINGS, KB_CORPUS_DATA, _model_initialized
 
-    if _model_initialized:
+    if _model_initialized and not force_reload:
         return
 
-    _model_initialized = True
+    _model_initialized = False
+    KB_CORPUS_EMBEDDINGS = None
+    KB_CORPUS_DATA = None
 
     print(f"Attempting to load SentenceTransformer model '{DEFAULT_MODEL_NAME}'...")
     try:
@@ -168,10 +169,13 @@ def initialize_model_and_kb(Route):
         KB_CORPUS_EMBEDDINGS = torch.stack(corpus_embeddings_list)
         KB_CORPUS_DATA = corpus_data_ordered
         print(f"Knowledge Base and embeddings prepared in {time.time() - start} seconds. Total {len(KB_CORPUS_DATA)} entries.")
+        _model_initialized = True
     else:
         KB_CORPUS_EMBEDDINGS = None
         KB_CORPUS_DATA = None
         print("No valid embeddings generated for Knowledge Base.")
+
+
 
 
 def get_relevant_incidents_weighted_context(

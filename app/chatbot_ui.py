@@ -115,6 +115,7 @@ if not st.session_state.logged_in:
                 st.session_state.active_graph = SUPPORT_GRAPH
             else:
                 st.session_state.active_graph = KB_GRAPH
+                initialize_model_and_kb("app/data/kb_embeddings.json", force_reload=True)
 
             st.rerun()
 
@@ -129,6 +130,7 @@ if st.session_state.role == "tech":
     )
 
     st.write("---")
+
     st.write("### ➕ Nueva entrada en la KB")
 
     # Campos principales
@@ -170,7 +172,6 @@ if st.session_state.role == "tech":
             st.error("⚠️ ID, título y descripción son obligatorios.")
             st.stop()
 
-        # Estado que se envía al grafo KB (no hay conversación, solo datos)
         kb_state = {
             "id": new_id,
             "title": title,
@@ -195,9 +196,38 @@ if st.session_state.role == "tech":
                 )
             )
             st.success(out.get("output", "✅ Entrada procesada correctamente."))
+            initialize_model_and_kb("app/data/kb_embeddings.json", force_reload=True)
 
         except Exception as e:
             st.error(f"❌ Error guardando la entrada: {e}")
+
+    if st.button("📘 Ver base de conocimiento"):
+        from app.services.KnowledgeBaseFiltering import (
+            KB_CORPUS_DATA,
+            initialize_model_and_kb
+        )
+
+        initialize_model_and_kb("app/data/kb_embeddings.json")
+
+        if not KB_CORPUS_DATA:
+            st.warning("La base de conocimiento está vacía.")
+        else:
+            st.subheader("📚 Base de conocimiento")
+            st.caption(f"{len(KB_CORPUS_DATA)} incidencias registradas")
+
+            for incident in KB_CORPUS_DATA:
+                with st.expander(f"{incident.get('id')} – {incident.get('title')}"):
+                    st.markdown(f"**Descripción:** {incident.get('description_problem', '')}")
+
+                    keywords = incident.get("keywords_tags", [])
+                    if keywords:
+                        st.markdown(f"**Palabras clave:** {', '.join(keywords)}")
+
+                    pasos = incident.get("resolution_guide_llm", {}).get("diagnostic_steps", [])
+                    if pasos:
+                        st.markdown("**Pasos de resolución:**")
+                        for i, step in enumerate(pasos, 1):
+                            st.markdown(f"- **Paso {i}:** {step.get('user_action', '')}")
 
     st.write("---")
     if st.button("⏪ Cerrar sesión"):

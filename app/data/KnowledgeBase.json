@@ -1158,5 +1158,92 @@
         "keywords_tags": [
             "incidencia"
         ]
+    },
+    {
+        "id": "INC_tecnico1@empresa.com_1",
+        "title": "nueva entrada",
+        "description_problem": "nueva entrada",
+        "symptoms": [
+            "nueva entrada"
+        ],
+        "resolution_guide_llm": {
+            "initial_questions": [
+                "nueva entrada"
+            ],
+            "diagnostic_steps": [
+                {
+                    "step_number": 1,
+                    "title": "Paso 1",
+                    "llm_instruction": "",
+                    "user_action": "nueva entrada"
+                }
+            ]
+        },
+        "escalation_criteria": "Si el usuario no consigue resolver la incidencia tras seguir todos los pasos, devuelve solved=false para generar un ticket a soporte técnico.",
+        "keywords_tags": [
+            "nueva entrada"
+        ]
+    },
+    {
+        "id": "INC_tecnico1@empresa.com_1",
+        "title": "nueva entrada",
+        "description_problem": "nueva entrada",
+        "symptoms": [
+            "nueva entrada"
+        ],
+        "resolution_guide_llm": {
+            "initial_questions": [
+                "nueva entrada"
+            ],
+            "diagnostic_steps": [
+                {
+                    "step_number": 1,
+                    "title": "Paso 1",
+                    "llm_instruction": "",
+                    "user_action": "nueva entrada"
+                }
+            ]
+        },
+        "escalation_criteria": "Si el usuario no consigue resolver la incidencia tras seguir todos los pasos, devuelve solved=false para generar un ticket a soporte técnico.",
+        "keywords_tags": [
+            "nueva entrada"
+        ]
+    },
+    {
+        "id": "Incidencia_numero_27",
+        "title": "Incidencia_numero_27",
+        "description_problem": "Incidencia_numero_27",
+        "symptoms": [
+            "Incidencia_numero_27"
+        ],
+        "resolution_guide_llm": {
+            "initial_questions": [
+                "Incidencia_numero_27"
+            ],
+            "diagnostic_steps": [
+                {
+                    "step_number": 1,
+                    "title": "Paso 1",
+                    "llm_instruction": "",
+                    "user_action": "Incidencia_numero_27"
+                }
+            ]
+        },
+        "escalation_criteria": "Si el usuario no consigue resolver la incidencia tras seguir todos los pasos, devuelve solved=false para generar un ticket a soporte técnico.",
+        "keywords_tags": [
+            "Incidencia_numero_27"
+        ]
+    },
+    {
+        "id": "INC_tecnico1@empresa.com_1",
+        "title": "INC_tecnico1@empresa.com_1",
+        "description_problem": "INC_tecnico1@empresa.com_1",
+        "symptoms": [],
+        "resolution_guide_llm": {
+            "initial_questions": [],
+            "diagnostic_steps": []
+        },
+        "escalation_criteria": "Si el usuario no consigue resolver la incidencia tras seguir todos los pasos, devuelve solved=false para generar un ticket a soporte técnico.",
+        "keywords_tags": []
     }
 ]

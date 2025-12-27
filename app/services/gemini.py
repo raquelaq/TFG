@@ -26,7 +26,6 @@ async def call_gemini_llm(conversation_history, tools=None):
     prompt = "\n".join(prompt_parts)
 
     try:
-        # El SDK es síncrono → lo ejecutamos en thread
         response = await asyncio.to_thread(
             model.generate_content,
             prompt
@@ -34,7 +33,6 @@ async def call_gemini_llm(conversation_history, tools=None):
 
         text = response.text.strip() if response.text else ""
 
-        # Heurística simple para solved (puedes afinarla)
         solved = True
         if "no puedo ayudarte" in text.lower() or "ticket" in text.lower():
             solved = False
