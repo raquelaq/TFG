@@ -25,6 +25,8 @@ class SupportState(TypedDict, total=False):
     solved: Optional[bool]
     output: Optional[str]
     #kb_answer: str
+    action: Optional[Literal["ticket", "none"]]
+
 
 # @traceable(name="DetectIntent")
 # async def detect_intent_node(state: SupportState) -> Command:
@@ -70,7 +72,14 @@ async def generative_agent_node(state: SupportState) -> Command:
 
     if not relevant_incidents:
         msg = "No he encontrado nada en la base de conocimiento. ¿Quieres que creemos un ticket?"
-        return Command(goto="Ticket", update={"output": msg, "solved": False})
+        return Command(
+            goto=END,
+            update={
+                "output": msg,
+                "solved": False,
+                "action": "ticket"
+            }
+        )
 
     conversation_total = get_conversation(user_email)
     prev = conversation_total.get("conversation", []) if isinstance(conversation_total, dict) else []
@@ -195,7 +204,14 @@ async def hybrid_response_node(state: SupportState) -> Command:
             "No he encontrado una solución clara en la base de conocimiento para tu consulta. "
             "¿Quieres que creemos un ticket para que soporte técnico lo revise?"
         )
-        return Command(goto="Ticket", update={"output": msg, "solved": False})
+        return Command(
+            goto=END,
+            update={
+                "output": msg,
+                "solved": False,
+                "action": "ticket"
+            }
+        )
 
     mejor = resultados[0]
 
@@ -207,7 +223,14 @@ async def hybrid_response_node(state: SupportState) -> Command:
             "No he encontrado una solución clara en la base de conocimiento para tu consulta. "
             "¿Quieres que creemos un ticket para que soporte técnico lo revise?"
         )
-        return Command(goto="Ticket", update={"output": msg, "solved": False})
+        return Command(
+            goto=END,
+            update={
+                "output": msg,
+                "solved": False,
+                "action": "ticket"
+            }
+        )
 
     incidente_id = mejor["id"]
 
@@ -244,7 +267,11 @@ async def hybrid_response_node(state: SupportState) -> Command:
 async def ticket_node(state: SupportState) -> Command:
     return Command(
         goto=END,
-        update={"output": "No he podido encontrar una solución clara. Si quieres, puedes crear un ticket con el botón.", "solved": False}
+        update={
+            "output": "No he podido encontrar una solución clara. Si quieres, puedes crear un ticket con el botón.",
+            "solved": False,
+            "action": "ticket"
+        }
     )
 
 @traceable(name="KBManager")

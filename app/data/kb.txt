@@ -1,4 +1,4 @@
-Instalar impresoras comunes
+*Instalar impresoras comunes
 Paso 1:
 Para instalar una impresora común que está en la red, primero abre el explorador de archivos de tu equipo. En la barra de direcciones, donde ves la ruta actual, escribe lo siguiente: "\\rpssrv" y pulsa Enter.
 Paso 2:
@@ -6,30 +6,30 @@ Verás una lista con todas las impresoras comunes disponibles. Si hay muchas, pu
 Paso 3:
 Cuando encuentres la impresora que quieres, haz doble clic sobre ella. Verás un mensaje que dice algo como "Conectando a EntradaTEST en rpssrv". Espera a que termine el proceso. ¡Y ya está! La impresora estará instalada y lista para usar.
 
-Restaurar contraseña del correo 
+*Restaurar contraseña del correo
 
-Paso 1: 
+Paso 1:
 Para recuperar tu cuenta de correo, ve al siguiente enlace y pon tu cuenta de correo corporativa (por ejemplo, soniacabreraperez@satocan.com):
 https://accounts.google.com/signin
-Paso 2: 
+Paso 2:
 Dale a "¿Has olvidado tu contraseña?"
 NOTA: Si te sale una imagen como esta, tendrás que volver a ponerte en contacto con nosotros enviando un correo a soporte@satocan.com adjuntando esta imagen. Nos pondremos en contacto contigo lo antes posible.
-Paso 3: 
+Paso 3:
 Te pedirá que pongas el teléfono que tienes como factor de autenticación. Puede ser tu número de teléfono personal o tu número de teléfono de empresa. Lo sabrás por los 2 últimos dígitos que te da como pista.
 Pon el número y dale a Enviar.
-Paso 4: 
+Paso 4:
 Ahora recibirás un código a este número. Tendrás que ponerlo.
-Paso 5: 
+Paso 5:
 Automáticamente, enviará otro código a tu cuenta de correo personal. Ponlo y dale a siguiente.
-Paso 6: 
+Paso 6:
 A continuación, dale a "Actualizar contraseña".
-Paso 7: 
+Paso 7:
 Pon una contraseña que te sea fácil de recordar, pero que a su vez no sea algo simple. Repítela en el campo de abajo y dale a "Guardar contraseña".
-Paso 8: 
+Paso 8:
 Y si ya te aparece una web como esta (en caso de ser un ordenador), es que ya habrás accedido a la cuenta. Si es un móvil, directamente se te agregará la cuenta al teléfono.
 Espero que te haya servido de ayuda.
 
-Actualizaciones del Sistema Operativo Windows 10 y 11
+*Actualizaciones del Sistema Operativo Windows 10 y 11
 En tu equipo, es súper importante tener las últimas actualizaciones instaladas. Así, todo funcionará sin problemas y estará bien protegido. Muchas veces, esto soluciona problemas de compatibilidad con otros dispositivos, como impresoras, monitores, auriculares, dispositivos Bluetooth, además de errores del sistema, etc.
 Paso 1:
 Para empezar, haz clic en el botón de Inicio o en el logo de Windows. Se abrirá el menú, y ahí, ve a Configuración > Actualización y Seguridad o Windows Update o Actualizaciones de Windows. Otra opción es usar el buscador del menú: simplemente haz clic en el menú de Windows y escribe "Actualizaciones".
@@ -39,7 +39,7 @@ Paso 2:
 Si sigues estos pasos sencillos, tu equipo se actualizará sin problemas.
 Si por alguna razón no te deja instalar las actualizaciones, por favor, ponte en contacto con soporte.
 
-Cambio de contraseña en Windows
+*Cambio de contraseña en Windows
 
 De vez en cuando, tu propio equipo te pedirá que cambies tu contraseña. Si no lo haces, llegará un día en que te obligará a cambiarla al iniciar sesión y no podrás entrar de la forma habitual.
 Otras veces, simplemente quieres cambiar la contraseña porque piensas que no es muy segura o porque alguien más la conoce.
@@ -52,7 +52,7 @@ Al final, verás un mensaje confirmando que tu contraseña ha cambiado. Recuerda
 
 ¡Y eso es todo! Si tienes cualquier otra duda o necesitas ayuda con algo más, ¡no dudes en preguntar! Estamos aquí para echarte una mano.
 
-Página web bloqueada
+*Página web bloqueada
 
 ¿Qué hacer si una web que consideras que es segura está bloqueada? Sigue estos sencillos pasos:
 Paso 1:
@@ -65,9 +65,9 @@ Revisa la categoría asignada. Si crees que no es correcta, marca la casilla de 
 Paso 4:
 Selecciona la nueva categoría que consideras adecuada, añade tu correo electrónico (ahí te avisaremos del resultado para que puedas acceder) y marca el Captcha. Finalmente, dale a Enviar.
 ¡Recuerda! Puedes clasificar tanto para desbloquear una URL como para bloquearla si crees que el contenido no es correcto.
-¡Listo! Si sigues estos pasos, podrás solicitar el cambio de clasificación de la página web. ¡Espero que te sea de ayuda! 
+¡Listo! Si sigues estos pasos, podrás solicitar el cambio de clasificación de la página web. ¡Espero que te sea de ayuda!
 
-No me carga una web o me fallan los certificados digitales
+*No me carga una web o me fallan los certificados digitales
 
 ¿Tienes problemas para acceder a una página web o te aparecen errores con los certificados digitales? ¡Tranquilo/a, es más común de lo que parece! Muchas veces, estos problemas están relacionados con las cookies y la caché de tu navegador, como Google Chrome. Aquí te explico cómo solucionarlo:
 Paso 1:
@@ -78,7 +78,7 @@ Paso 3:
 Una vez que hayas marcado todo, dale al botón de "Borrar datos". Espera a que termine el proceso. Cuando acabe, cierra todas las ventanas de tu navegador y vuelve a abrirlas.
 ¡Con esto, deberías poder acceder a la web sin problemas! Si sigues teniendo problemas, no dudes en contactar con soporte. ¡Estamos aquí para ayudarte!
 
-No tengo internet al desplazarme de sede (sin acceso a Internet en otras sedes)
+*No tengo internet al desplazarme de sede (sin acceso a Internet en otras sedes)
 
 Si al cambiarte de sede, por ejemplo, de la oficina a Salobre, te quedas sin conexión, puede que tengas este problema. En la parte del Wifi deberías ver un mensaje como "Sin Internet, segura".
 Es un problema común que estamos intentando solucionar, pero mientras encontramos una solución definitiva, aquí tienes una forma fácil de arreglarlo.
@@ -100,7 +100,7 @@ Primero, abre tu correo y busca el icono del engranaje. Lo encontrarás a la izq
 Paso 2:
 Una vez dentro de los ajustes, en la parte general, baja hasta que encuentres las "Funciones inteligentes". Asegúrate de que estén activadas. Si no lo están, ¡actívalas ahora mismo! Con esto, Gemini debería funcionar correctamente y podrá acceder a tus archivos sin problemas.
 
-Tengo acceso a internet, pero no a los servidores/herramientas corporativas
+*Tengo acceso a internet, pero no a los servidores/herramientas corporativas
 
 Si te encuentras con que tienes internet, pero no puedes acceder a herramientas como Sigrid, Proxium, Avalon, Gsbase o Sage, lo primero que vamos a revisar es si Global Protect está funcionando correctamente. Puedes encontrar el icono de Global Protect en la barra de notificaciones, abajo a la derecha, junto al icono de la WiFi, o también puedes buscarlo escribiendo "Global Protect" en el menú de inicio y abriendo la aplicación.
 Aquí pueden pasar varias cosas, pero las más comunes son:

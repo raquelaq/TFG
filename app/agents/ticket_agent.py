@@ -10,38 +10,20 @@ class TicketAgent:
         self.cached_summary = cached_summary
 
     async def generate_ticket_contents(self):
-        if self.cached_summary:
-            return {
-                "title": "Incidencia reportada por usuario",
-                "summary": self.cached_summary
-            }
+        user_messages = [
+            m["content"]
+            for m in self.messages
+            if m.get("role") == "user"
+        ]
 
-        prompt = f"""
-    A partir de los siguientes mensajes entre un chat de soporte y un usuario,
-    crea un título corto descriptivo del problema y un resumen claro para el equipo técnico.
-    Devuelve el resultado en formato JSON **SIN TEXTO ADICIONAL**:
+        summary = (
+                "\n".join(f"- {msg}" for msg in user_messages)
+        )
 
-    {{ "title": "...", "summary": "..." }}
-
-    Mensajes:
-    \"\"\"{json.dumps(self.messages, ensure_ascii=False)}\"\"\"
-    """
-
-        raw = await call_gemini_prompt(prompt)
-
-        # 🔒 BLINDAJE OBLIGATORIO
-        try:
-            parsed = json.loads(raw)
-            return {
-                "title": parsed.get("title", "Incidencia reportada por usuario"),
-                "summary": parsed.get("summary", raw)
-            }
-        except json.JSONDecodeError:
-            # Fallback si Gemini no cumple
-            return {
-                "title": "Incidencia reportada por usuario",
-                "summary": raw
-            }
+        return {
+            "title": "Incidencia reportada por usuario",
+            "summary": summary[:1500]
+        }
 
     async def create_ticket(self, image_path=None):
         ticket_info = await self.generate_ticket_contents()

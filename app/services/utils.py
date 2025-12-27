@@ -1,7 +1,10 @@
 import re
 import json
 import os
-from datetime import datetime 
+import time
+from datetime import datetime
+from idlelib.iomenu import encoding
+#from google.generativeai import genai
 from ..config import *
 from ..services.gemini import *
 
@@ -13,6 +16,12 @@ import requests
 from cryptography.x509 import load_pem_x509_certificate
 from cryptography.hazmat.backends import default_backend
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+KB_PATH = os.path.join(DATA_DIR, "KnowledgeBase.json")
+CONVERSATION_STORE_PATH = os.path.join(DATA_DIR, "conversation_store.json")
+
 def convert_markdown_for_google_chat(text: str) -> str:
     text = re.sub(r'\s+\*\s+', '\n- ', text)
     text = re.sub(r'(?<!\*)\*(?!\*)(.*?)\*(?!\*)', r'_\1_', text)
@@ -21,8 +30,8 @@ def convert_markdown_for_google_chat(text: str) -> str:
     return text
 
 def get_conversation(chat_id: str):
-    if os.path.exists(DATA_STORE):
-        with open(DATA_STORE + 'conversation_store.json', 'r') as f:
+    if os.path.exists(KB_PATH):
+        with open(CONVERSATION_STORE_PATH, 'r') as f:
             try:
                 data = json.load(f)
             except json.JSONDecodeError:
@@ -31,30 +40,56 @@ def get_conversation(chat_id: str):
     return []
 
 def save_conversation(chat_id: str, conversation):
-    if os.path.exists(DATA_STORE):
-        with open(DATA_STORE + 'conversation_store.json', 'r') as f:
+    if os.path.exists(KB_PATH):
+        with open(CONVERSATION_STORE_PATH, 'r') as f:
             data = json.load(f)
     else:
         data = {}
     data[chat_id] = conversation
-    with open(DATA_STORE + 'conversation_store.json', 'w') as f:
-        json.dump(data, f)
+    with open(CONVERSATION_STORE_PATH, 'w') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 def delete_converation_cache():
-    if os.path.exists(DATA_STORE):
-        with open(DATA_STORE + 'conversation_store.json', 'w') as f:
-            json.dump({}, f)
+    if os.path.exists(KB_PATH):
+        with open(KB_PATH + 'conversation_store.json', 'w') as f:
+            json.dump({}, f, indent=4, ensure_ascii=False)
+
+def delete_conversation_cache_user(user=None):
+    if user:
+        conversation_file_path = os.path.join(KB_PATH, 'conversation_store.json')
+        if os.path.exists(conversation_file_path):
+            try:
+                with open(conversation_file_path, 'r') as f:
+                    conversation_data = json.load(f)
+            except json.JSONDecodeError:
+                # Handle case where file is empty or malformed JSON
+                conversation_data = {}
+            if user in conversation_data:
+                del conversation_data[user]
+                with open(conversation_file_path, 'w') as f:
+                    json.dump(conversation_data, f, indent=4, ensure_ascii=False)  # Using indent for readability
+                print(f"User '{user}' conversation data removed successfully.")
+                return True  # Indicate success
+            else:
+                print(f"User '{user}' not found in conversation cache.")
+                return False  # Indicate user not found
+        else:
+            print("Conversation store file does not exist.")
+            return False  # Indicate file not found
+    else:
+        print("No user specified for deletion.")
+        return False  # Indicate no user specified
 
 def read_kb_file() -> str:    
-    kb_file_path = DATA_STORE + 'kb.txt'
+    kb_file_path = KB_PATH + 'kb.txt'
     if os.path.exists(kb_file_path):
         with open(kb_file_path, 'r', encoding='utf-8') as f:
             return f.read()
     return ""
 
 def write_kb_file(content: str):
-    print(DATA_STORE + 'kb.txt')
-    kb_file_path = DATA_STORE + 'kb.txt'
+    print(KB_PATH + 'kb.txt')
+    kb_file_path = KB_PATH + 'kb.txt'
     with open(kb_file_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
@@ -74,16 +109,6 @@ def api_key_guard(request: Request, x_api_key: str = Header(None)):
         raise HTTPException(status_code=403, detail="API key not allowed for this endpoint")
 
     return api_data
-
-
-
-
-
-
-
-#############################
-#   VALIDAMOS GOOGLE AUTH   #
-#############################
 
 def get_google_chat_certificates():
     url = "https://www.googleapis.com/service_accounts/v1/metadata/x509/chat@system.gserviceaccount.com"
@@ -181,5 +206,91 @@ Base tus respuestas únicamente en el último problema de la siguiente conversac
         }
     ]
 
-    parsed_reply = await call_gemini_prompt(prompt, tools)
+    parsed_reply = await call_gemini_prompt(prompt)
     return parsed_reply
+
+def respuesta_con_agente(agent, pregunta: str) -> str: # --> ESTO ES MÍO
+    try:
+        return agent.run(pregunta)
+    except Exception as e:
+        return f"⚠️ Error procesando con el agente: {e}"
+
+#################################
+# PRUEBA FILTRADO LLM
+#################################
+
+
+# def find_similar_incidents_gemini(user_email, user_message):
+#     client = genai.Client(api_key="AIzaSyCp_J8rN857FNNRbGGCnepM_9Fly5249Jc")
+#
+#     try:
+#         with open(KB_PATH + 'KnowledgeBase.json', 'r', encoding='latin-1') as f:
+#             incidents_data = json.load(f)
+#     except FileNotFoundError:
+#         print(f"Error: The file was not found.")
+#         return []
+#     except json.JSONDecodeError:
+#         print(f"Error: Could not decode JSON from file. Check file format.")
+#         return []
+#
+#     conversation_total = get_conversation(user_email)
+#     if isinstance(conversation_total, list):
+#         # Modo antiguo: solo hay conversación
+#         conversation = conversation_total
+#         incident_ids = []
+#     elif isinstance(conversation_total, dict):
+#         # Modo nuevo: hay conversación + incidencias
+#         conversation = conversation_total.get("conversation", [])
+#         incident_ids = conversation_total.get("Incidents", [])
+#     else:
+#         # Fallback por seguridad
+#         conversation = []
+#         incident_ids = []
+#
+#     conversation.append({"role": "user", "content": user_message, "timestamp": datetime.now().isoformat()})
+#
+#     # Prepare incident data for the LLM
+#     # We only send id, title, description_problem, and keywords_tags
+#     incidents_for_llm = []
+#     for incident in incidents_data:
+#         incidents_for_llm.append({
+#             "id": incident.get("id"),
+#             "title": incident.get("title"),
+#             "description_problem": incident.get("description_problem"),
+#             "keywords_tags": incident.get("keywords_tags", [])
+#         })
+#
+#     prompt = f"""
+#         Given the following user conversation and a list of incidents, identify the 8 incidents
+#         that are most similar or relevant to the conversation.
+#
+#         User Conversation:
+#         "{conversation}"
+#
+#         Incidents:
+#         {json.dumps(incidents_for_llm, indent=4)}
+#
+#         Please return a JSON array containing only the 'id' of the 8 most similar incidents,
+#         ranked from most to least similar.
+#         Example: ["incident_id_1", "incident_id_2", "incident_id_3"]
+#         """
+#     start = time.time()
+#     response = client.models.generate_content(
+#         model="gemini-2.5-flash-lite-preview-06-17",
+#         contents=prompt,
+#         config={
+#             'response_mime_type': 'application/json',
+#             'response_schema': {
+#                 "type": "array",
+#                 "items": {
+#                     "type": "string",
+#                     "enum": [incident.get("id") for incident in incidents_data],
+#                 },
+#             },
+#         }
+#     )
+#
+#     # Use the response as a JSON string.
+#     print(time.time() - start)
+#     print(response.text)
+#     return response.text
