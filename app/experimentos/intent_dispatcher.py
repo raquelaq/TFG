@@ -1,4 +1,4 @@
-from ..services.gemini import call_gemini_prompt
+from app.services.gemini import call_gemini_prompt
 import json
 
 INTENT_PROMPT_TEMPLATE = """

@@ -7,10 +7,14 @@ from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
 from rapidfuzz import process
 
+"""
+Módulo de búsqueda híbrida (BM25 + embeddings).
+Usado únicamente cuando el usuario selecciona 'Modelo ML (embeddings)'.
+"""
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 KB_PATH = os.path.join(BASE_DIR, "..", "data", "KnowledgeBase.json")
 
-# ---- Variables globales (inicializadas perezosamente) ----
 kb = None
 kb_filtrada = None
 KB_VOCAB = set()
@@ -41,7 +45,7 @@ def initialize_hybrid_search():
     global kb, kb_filtrada, KB_VOCAB, bm25, embeddings_kb, model, texts
 
     if kb is not None:
-        return  #
+        return
 
     if not os.path.exists(KB_PATH):
         raise FileNotFoundError(f"No se encontró la KB en {KB_PATH}")
@@ -152,4 +156,3 @@ def get_kb_item_by_id(incidente_id: str):
         if item.get("id") == incidente_id:
             return item
     return None
-

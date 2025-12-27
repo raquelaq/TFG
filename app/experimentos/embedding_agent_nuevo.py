@@ -1,6 +1,5 @@
 import os
-import numpy as np
-from app.services.embeddings_index import EmbeddingsIndex
+from app.experimentos.embeddings_index import EmbeddingsIndex
 
 SIMILARITY_THRESHOLD = float(os.getenv("EMB_SIM_THRESHOLD", "0.75"))
 TOP_K = int(os.getenv("EMB_TOP_K", "3"))

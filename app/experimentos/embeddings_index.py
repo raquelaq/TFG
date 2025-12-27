@@ -6,12 +6,10 @@ import torch
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# -------- Config por entorno / config.py --------
 KB_JSON_PATH = os.getenv("KB_JSON_PATH", "app/data/KnowledgeBase.json")
 EMB_CACHE_PATH = os.getenv("KB_EMBEDDINGS_CACHE", "app/data/kb_embeddings.json")
 EMB_MODEL_PATH = os.getenv("EMBEDDING_MODEL_PATH", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 
-# -------- Utilidades --------
 def _norm(s: str) -> str:
     if not s:
         return ""
@@ -22,7 +20,6 @@ def _norm(s: str) -> str:
 
 def _compose_entry_text(entry: Dict[str, Any],
                         field_weights: Dict[str, float]) -> Tuple[str, Dict[str, str]]:
-    """Crea un texto final ponderado por campos y devuelve también los textos por campo para debug."""
     fields_raw = {
         "title": entry.get("title", ""),
         "description": entry.get("description_problem", ""),
@@ -35,8 +32,6 @@ def _compose_entry_text(entry: Dict[str, Any],
         "escalation": entry.get("escalation_criteria", ""),
     }
     fields_norm = {k: _norm(v) for k, v in fields_raw.items()}
-    # Ponderamos concatenando el campo tantas veces como su peso redondeado (simple y efectivo)
-    # O, mejor, aplicamos pesos en el vector; aquí dejamos el enfoque simple (repetición) por velocidad.
     text_weighted = []
     for k, v in fields_norm.items():
         w = field_weights.get(k, 1.0)
@@ -89,7 +84,6 @@ class EmbeddingsIndex:
             self._corpus_texts.append(txt)
 
     def _save_cache(self):
-        # Guardamos embeddings + ids para evitar mismatch si cambia la KB
         obj = {
             "ids": self._ids,
             "embeddings": self._embeddings.tolist()
@@ -120,7 +114,6 @@ class EmbeddingsIndex:
         if not force_rebuild and self._load_cache():
             return
 
-        # Recalcular embeddings del corpus
         emb = self._model.encode(self._corpus_texts, convert_to_tensor=False, normalize_embeddings=True)
         self._embeddings = np.asarray(emb, dtype=np.float32)
         self._save_cache()

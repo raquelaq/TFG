@@ -5,8 +5,6 @@ from sentence_transformers import SentenceTransformer, util
 import time
 import os
 import torch
-from datetime import datetime
-import requests
 from ..config import *
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -14,15 +12,14 @@ KB_PATH = os.path.join(BASE_DIR, "data", "KnowledgeBase.json")
 
 EMBEDDING_CACHE_FILE = "../data/kb_embeddings.json"
 DEFAULT_MODEL_NAME = 'multi-qa-mpnet-base-dot-v1'
-#KB_FILE_PATH = 'app/data/KnowledgeBase.json' # Define KB file path centrally
 
-model: Optional[SentenceTransformer] = None # Will be loaded at app startup
+model: Optional[SentenceTransformer] = None
 KB_CORPUS_EMBEDDINGS: Optional[torch.Tensor] = None
 KB_CORPUS_DATA: Optional[List[Dict[str, Any]]] = None
 
 conversation_history_embeddings: Dict[str, List[torch.Tensor]] = {}
 conversation_history_texts: Dict[str, List[str]] = {}
-_chat_histories_in_memory: Dict[str, List[Dict[str, Any]]] = {} # Simple in-memory storage for chat history
+_chat_histories_in_memory: Dict[str, List[Dict[str, Any]]] = {}
 
 _model_initialized = False
 
@@ -49,7 +46,6 @@ def preprocess_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-#def load_embeddings_from_cache(cache_file: str = EMBEDDING_CACHE_FILE) -> Optional[Dict[str, torch.Tensor]]:
 def load_embeddings_from_cache(cache_file: str) -> Optional[Dict[str, torch.Tensor]]:
     if not os.path.exists(cache_file):
         return None
@@ -71,13 +67,8 @@ def save_embeddings_to_cache(embeddings: Dict[str, torch.Tensor], cache_file: st
         print(f"Error saving embeddings cache: {e}")
 
 
-def get_weighted_context_embedding(
-    user_email: str,
-    new_message_embedding: torch.Tensor,
-    decay_factor: float = 0.8,
-    max_history: int = 5
-) -> torch.Tensor:
-    global conversation_history_embeddings # Must be global to modify the dict
+def get_weighted_context_embedding(user_email: str, new_message_embedding: torch.Tensor, decay_factor: float = 0.8, max_history: int = 5) -> torch.Tensor:
+    global conversation_history_embeddings
 
     if user_email not in conversation_history_embeddings:
         conversation_history_embeddings[user_email] = []
@@ -98,18 +89,6 @@ def get_weighted_context_embedding(
     context_embedding = torch.stack(weighted_embeddings).sum(dim=0)
     return context_embedding / context_embedding.norm()
 
-def reset_conversation_context(user_email: str = None):
-    global conversation_history_embeddings, conversation_history_texts
-    if user_email:
-        conversation_history_embeddings.pop(user_email, None)
-        conversation_history_texts.pop(user_email, None)
-        print(f"Conversation context cleared for user: {user_email}")
-    else:
-        conversation_history_embeddings.clear()
-        conversation_history_texts.clear()
-        print("All conversation contexts cleared.")
-
-# --- Core Loading Function for FastAPI Startup ---
 
 def initialize_model_and_kb(Route, force_reload=False):
 
@@ -131,7 +110,7 @@ def initialize_model_and_kb(Route, force_reload=False):
         _model_initialized = False
         print(f"CRITICAL ERROR: Failed to load SentenceTransformer model: {e}")
         model = None
-        return # Cannot proceed without model
+        return #
 
     print("Loading Knowledge Base data and embeddings...")
     data = load_json_data(KB_PATH)
@@ -150,7 +129,6 @@ def initialize_model_and_kb(Route, force_reload=False):
     for incident in data:
         incident_id = incident['id']
         text_to_embed = preprocess_text(incident.get('description_problem', '') + ' ' + incident.get('title', '') + ' ' + ", ".join(incident.get('keywords_tags', [])))
-        # print(text_to_embed)
 
         if cached_embeddings and incident_id in cached_embeddings:
             corpus_embeddings_list.append(cached_embeddings[incident_id])
@@ -176,8 +154,6 @@ def initialize_model_and_kb(Route, force_reload=False):
         print("No valid embeddings generated for Knowledge Base.")
 
 
-
-
 def get_relevant_incidents_weighted_context(
     user_email: str,
     query: str,
@@ -189,7 +165,6 @@ def get_relevant_incidents_weighted_context(
 ) -> List[Dict[str, Any]]:
     if not isinstance(KB_CORPUS_DATA, list):
         return []
-    # Ensure the model and knowledge base data are loaded
     if model is None:
         print("Error: SentenceTransformer model is not loaded. Cannot perform filtering.")
         return []
@@ -197,60 +172,47 @@ def get_relevant_incidents_weighted_context(
         print("Error: Knowledge Base embeddings not loaded. Cannot perform filtering.")
         return []
 
-    # Load past incidents from conversation store
     incidents = []
     if os.path.exists(KB_PATH + 'conversation_store.json'):
         with open(KB_PATH + 'conversation_store.json', 'r') as f:
             try:
                 data = json.load(f)
             except json.JSONDecodeError:
-                data = {}  # If file is empty or malformed, initialize with an empty dictionary
+                data = {}
             incidents = data.get(user_email, {}).get("Incidents", [])
     else:
         incidents = []
 
-    # Encode the current query
     query_embedding = model.encode(query, convert_to_tensor=True)
 
-    # Get the weighted context embedding
     context_embedding = get_weighted_context_embedding(user_email, query_embedding, decay_factor, max_history)
 
-    # Calculate scores for query and context against knowledge base embeddings
     query_scores = util.dot_score(query_embedding.unsqueeze(0), KB_CORPUS_EMBEDDINGS)[0]
     context_scores = util.dot_score(context_embedding.unsqueeze(0), KB_CORPUS_EMBEDDINGS)[0]
 
-    # Combine scores based on weights
     combined_scores = (query_scores * query_weight) + (context_scores * context_weight)
 
-    # Pair incidents from KB_CORPUS_DATA with their combined scores
     incident_scores = list(zip(KB_CORPUS_DATA, combined_scores.tolist()))
-    # Sort incidents by score in descending order
     sorted_incidents = sorted(incident_scores, key=lambda x: x[1], reverse=True)
 
-    # Identify past incidents that are present in KB_CORPUS_DATA
     past_incidents_from_kb = []
 
     for item in KB_CORPUS_DATA:
         if "id" in item and item["id"] in incidents:
             past_incidents_from_kb.append(item)
-    # Combine top N results and past incidents, ensuring uniqueness by 'id'
     unique_incident_ids = set()
     top_results = []
 
-    # Add top_n incidents first
-    # print(sorted_incidents)
     for incident_dict, score in sorted_incidents[:top_n]:
         if "id" in incident_dict and incident_dict["id"] not in unique_incident_ids:
             top_results.append(incident_dict)
             unique_incident_ids.add(incident_dict["id"])
 
-    # Add past incidents, ensuring they are not duplicates of what's already added
     for incident_dict in past_incidents_from_kb:
         if "id" in incident_dict and incident_dict["id"] not in unique_incident_ids:
             top_results.append(incident_dict)
             unique_incident_ids.add(incident_dict["id"])
 
-    #return top_results if isinstance(top_results, list) else []
     return top_results
 
 def rebuild_embeddings(cache_file: str = EMBEDDING_CACHE_FILE) -> None:

@@ -4,7 +4,6 @@ from langgraph.types import Command
 from langsmith import traceable
 from datetime import datetime
 import json
-import os
 
 from app.services.gemini import call_gemini_llm
 from app.services.utils import get_conversation, save_conversation, convert_markdown_for_google_chat
@@ -26,29 +25,6 @@ class SupportState(TypedDict, total=False):
     output: Optional[str]
     #kb_answer: str
     action: Optional[Literal["ticket", "none"]]
-
-
-# @traceable(name="DetectIntent")
-# async def detect_intent_node(state: SupportState) -> Command:
-#     user_msg = state.get("user_message", "").strip().lower()
-#
-#     if state.get("solved") is True and user_msg in (
-#             "no", "no.", "nop", "nope", "negativo", "no se resolvió", "no funciona"
-#     ):
-#         return Command(goto="Ticket")
-#
-#     if state.get("role") == "tech":
-#         return Command(goto="KBManager")
-#
-#     intent = await detect_intent(state["user_message"])
-#
-#     if intent == "UNKNOWN":
-#         return Command(
-#             goto=END,
-#             update={"output": "¿Podrías darme un poco más de detalle?", "solved": False}
-#         )
-#
-#     return Command(goto="RouteByResponseMode", update={"intent": intent})
 
 @traceable(name="RouteByResponseMode")
 async def route_by_response_mode(state: SupportState) -> Command:

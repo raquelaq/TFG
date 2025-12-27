@@ -8,8 +8,6 @@ from ..services.utils import *
 from ..agents.ticket_agent import TicketAgent
 from app.agents.support_graph import build_support_graph
 from ..services.KnowledgeBaseFiltering import *
-from ..agents.embedding_agent import responder_con_embeddings_custom
-from ..services.hybrid_search import buscar_hibrido
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -43,28 +41,6 @@ async def delete_cache_user(
     except Exception as e:
         print("ERROR: ", str(e))
         raise HTTPException(status_code=500, detail=f"Error deleting cache: {str(e)}")
-    
-@router.post("/reload_kb")
-async def reload_kb(request: Request, api_key_info: dict = Depends(api_key_guard)):
-    try:
-        data = await request.json()
-        new_kb_content = data.get("content", "")
-
-        if not new_kb_content:
-            return {"message": "No content provided to update the knowledge base."}
-        
-        write_kb_file(new_kb_content)
-
-        if os.path.exists("app/data/kb_embeddings.json"):
-            os.remove("app/data/kb_embeddings.json")
-
-        initialize_model_and_kb("app/data/kb_embeddings.json")
-
-        return {"message": "Knowledge base updated successfully."}
-    
-    except Exception as e:
-        print("ERROR: ", str(e))
-        return {"message": "Error updating the knowledge base."}
 
 @router.post("/message")
 async def handle_message(request: Request, authorization: str = Header(None)):
@@ -73,7 +49,6 @@ async def handle_message(request: Request, authorization: str = Header(None)):
         request_type = data.get("type")
 
         if request_type == "MESSAGE":
-            #modo = data.get("modo_respuesta", "IA Generativa")
             pregunta = data.get("message", {}).get("text")
             usuario = (
                 data.get("message", {})
@@ -162,12 +137,6 @@ async def handle_message(request: Request, authorization: str = Header(None)):
             "text": "Lo siento, ha ocurrido un error y no puedo ayudarte ahora mismo."
         }
 
-# -------------------------------------------------------------------
-# LEGACY FUNCTION (NOT USED)
-# This function belongs to an earlier architecture version where
-# the generative flow was implemented outside LangGraph.
-# It is kept for reference and comparison purposes.
-# -------------------------------------------------------------------
 async def respond_message(data):
     try:
         user_message = data.get("message", {}).get("text")
@@ -205,7 +174,6 @@ async def respond_message(data):
             incident_ids = []
 
 # todo especificar que no escriba el llm_action
-        #       • Sigue los pasos dados para ayudar al usuario. No escribas todos los pasos en 1 solo mensaje, resuelvelo de forma iterativa
         system_msg = {
             "role": "system",
             "content": f"""Actúa como un asistente de soporte informático que guía a los usuarios de negocio en las consultas más frecuentes.
@@ -285,10 +253,6 @@ async def respond_message(data):
         print("Gemini: ", time.time() - start_gemini)
         response_text = convert_markdown_for_google_chat(parsed_reply["Response"])
         solved = parsed_reply["solved"]
-
-        # response_text += "<https://gemini.google.com/app/ebcac73292a98ac7?hl=es-ES|there>"
-
-        # response_text = r"{}".format(response_text)
 
         conversation.append({"role": "model", "content": parsed_reply["Response"], "timestamp": datetime.now().isoformat()})
         save_conversation(user_email, {"conversation": conversation, "Incidents": [e["id"] for e in relevant_incidents]})
@@ -399,284 +363,3 @@ async def onClick(data):
         return {
             "text": f"❌ Error inesperado al procesar la acción: {str(e)}"
         }
-
-# async def responder_con_embeddings_ml(pregunta: str, usuario: str):
-#     resultados = buscar_hibrido(pregunta, alpha=0.25, top_k=1)
-#
-#     if not resultados:
-#         texto = (
-#             "No he encontrado una solución clara en la base de conocimiento para tu consulta. "
-#             "Si quieres, puedo ayudarte a crear un ticket para que soporte técnico lo revise."
-#         )
-#         return {
-#             "text": texto,
-#             "need_feedback": False,
-#             "ticket_suggested": True,
-#         }
-#
-#     mejor = resultados[0]
-#
-#     if len(resultados) > 1:
-#         delta = abs(resultados[0]["score_hybrid"] - resultados[1]["score_hybrid"])
-#         if delta < 0.05:
-#             return {
-#                 "text": (
-#                     "Tu consulta puede referirse a varios problemas distintos. "
-#                     "¿Podrías darme un poco más de contexto para ayudarte mejor?"
-#                 ),
-#                 "need_feedback": False,
-#                 "ticket_suggested": False,
-#             }
-#
-#     print(
-#         f"🔎 Hybrid scores | "
-#         f"hybrid={mejor['score_hybrid']:.3f} | "
-#         f"cosine={mejor['score_cosine']:.3f} | "
-#         f"bm25={mejor['score_bm25']:.3f}"
-#     )
-#
-#     if (
-#             mejor["score_cosine"] < MIN_COSINE_SIMILARITY
-#             or mejor["score_hybrid"] < MIN_HYBRID_SCORE
-#     ):
-#         return {
-#             "text": (
-#                 "No he encontrado una solución clara en la base de conocimiento para tu consulta. "
-#                 "¿Quieres que creemos un ticket para que soporte técnico lo revise?"
-#             ),
-#             "need_feedback": False,
-#             "ticket_suggested": True,
-#         }
-#
-#     incidente_id = mejor["id"]
-#
-#     with open(KB_PATH, "r", encoding="utf-8") as f:
-#         kb = json.load(f)
-#
-#     incidente = next((x for x in kb if x.get("id") == incidente_id), None)
-#
-#     if not incidente:
-#         return {
-#             "text": "He encontrado una coincidencia, pero no puedo cargar los detalles de la guía en la KB.",
-#             "need_feedback": False,
-#             "ticket_suggested": False,
-#         }
-#
-#     preguntas = incidente.get("questions_llm", [])
-#     pasos = incidente.get("resolution_guide_llm", {}).get("diagnostic_steps", [])
-#
-#     texto_final = f"{incidente.get('title', '(Sin título)')}\n\n"
-#
-#     if preguntas:
-#         texto_final += "**Preguntas iniciales:**\n"
-#         for p in preguntas:
-#             texto_final += f"- {p}\n"
-#         texto_final += "\n"
-#
-#     if pasos:
-#         texto_final += "**Pasos para resolver la incidencia:**\n\n"
-#         for i, step in enumerate(pasos, 1):
-#             titulo = (step.get("title") or "").strip()
-#             accion = (step.get("user_action") or "").strip()
-#
-#             if titulo:
-#                 texto_final += f"**Paso {i}: {titulo}**\n"
-#             else:
-#                 texto_final += f"**Paso {i}:**\n"
-#
-#             if accion:
-#                 texto_final += f"{accion}\n\n"
-#             else:
-#                 texto_final += "\n"
-#     else:
-#         texto_final += "⚠️ Esta incidencia no tiene pasos detallados en la guía.\n\n"
-#
-#     texto_final += "¿El problema quedó resuelto?"
-#
-#     # 4) Devolvemos texto + flag para que Streamlit pregunte Sí/No
-#     return {
-#         "text": texto_final,
-#         "need_feedback": True,
-#         "ticket_suggested": False,
-#     }
-
-
-
-# async def responder_con_embeddings_ml(pregunta: str, usuario: str):
-#     # Buscar en híbrido
-#     resultados = buscar_hibrido(pregunta, alpha=0.25, top_k=1)
-#
-#     # Si no hay resultados
-#     if not resultados or resultados[0]["score_hybrid"] < 0.40:
-#         return {
-#             "text": "No he encontrado una solución clara en la base de conocimiento. ¿Quieres que creemos un ticket?",
-#             "cardsV2": [
-#                 {
-#                     "cardId": "crearTicket",
-#                     "card": {
-#                         "header": {
-#                             "title": "¿Crear ticket de soporte?",
-#                             "subtitle": "Puedo generar un ticket con prioridad"
-#                         },
-#                         "sections": [{
-#                             "widgets": [{
-#                                 "buttonList": {
-#                                     "buttons": [{
-#                                         "text": "Crear ticket",
-#                                         "onClick": {
-#                                             "action": {
-#                                                 "function": "createJiraTicket",
-#                                                 "parameters": [
-#                                                     {
-#                                                         "key": "messages",
-#                                                         "value": json.dumps([
-#                                                             {"role": "user", "content": pregunta}
-#                                                         ])
-#                                                     }
-#                                                 ]
-#                                             }
-#                                         }
-#                                     }]
-#                                 }
-#                             }]
-#                         }]
-#                     }
-#                 }
-#             ]
-#         }
-#
-#     # Si hay resultado
-#     mejor = resultados[0]
-#     incidente_id = mejor["id"]
-#
-#     # Cargar KB para obtener pasos
-#     with open("app/data/KnowledgeBase.json", "r", encoding="utf-8") as f:
-#         kb = json.load(f)
-#
-#     incidente = next((x for x in kb if x["id"] == incidente_id), None)
-#
-#     if not incidente:
-#         return {"text": "Error interno: la incidencia seleccionada no existe en la KB."}
-#
-#     pasos = incidente.get("resolution_guide_llm", {}).get("diagnostic_steps", [])
-#     preguntas = incidente.get("questions_llm", [])
-#
-#     texto_final = f"📘 **Guía encontrada:** {incidente['title']}\n\n"
-#
-#     # Agregar preguntas iniciales
-#     if preguntas:
-#         texto_final += "**Preguntas iniciales:**\n"
-#         for p in preguntas:
-#             texto_final += f"- {p}\n"
-#         texto_final += "\n"
-#
-#     # Agregar pasos
-#     if pasos:
-#         texto_final += "**Pasos para resolver la incidencia:**\n"
-#         for i, step in enumerate(pasos, 1):
-#             titulo = step.get("title", "")
-#             accion = step.get("user_action", "")
-#             texto_final += f"**Paso {i}: {titulo}**\n{accion}\n\n"
-#     else:
-#         texto_final += "⚠️ La incidencia no tiene pasos definidos.\n\n"
-#
-#     # Pregunta final
-#     texto_final += "---\n¿El problema quedó resuelto?"
-#
-#     # Guardamos en conversación estado pendiente de confirmación
-#     return {
-#         "text": texto_final,
-#         "cardsV2": [
-#             {
-#                 "cardId": "confirmation",
-#                 "card": {
-#                     "header": { "title": "¿Se solucionó la incidencia?" },
-#                     "sections": [{
-#                         "widgets": [{
-#                             "buttonList": {
-#                                 "buttons": [
-#                                     {
-#                                         "text": "Sí, solucionado",
-#                                         "onClick": {
-#                                             "action": {
-#                                                 "function": "markSolved",
-#                                                 "parameters": []
-#                                             }
-#                                         }
-#                                     },
-#                                     {
-#                                         "text": "No, seguir con ticket",
-#                                         "onClick": {
-#                                             "action": {
-#                                                 "function": "createJiraTicket",
-#                                                 "parameters": [
-#                                                     {
-#                                                         "key": "messages",
-#                                                         "value": json.dumps([
-#                                                             {"role": "user", "content": pregunta}
-#                                                         ])
-#                                                     }
-#                                                 ]
-#                                             }
-#                                         }
-#                                     }
-#                                 ]
-#                             }
-#                         }]
-#                     }]
-#                 }
-#             }
-#         ]
-#     }
-
-
-# async def responder_con_embeddings_ml(pregunta: str, usuario: str):
-#     resultado = responder_con_embeddings_custom(pregunta)
-#
-#     if not resultado["solved"]:
-#         print("✅ Resuelto con embeddings (sin solución, esperando confirmación de ticket)")
-#         return {
-#             "text": resultado["respuesta"],
-#             "cardsV2": [
-#                 {
-#                     "cardId": "helpOptions",
-#                     "card": {
-#                         "header": {
-#                             "title": "¿Quieres que creemos un ticket para soporte?",
-#                             "subtitle": "Al haber utilizado este canal, tu ticket será tratado de forma prioritaria"
-#                         },
-#                         "sections": [
-#                             {
-#                                 "widgets": [
-#                                     {
-#                                         "buttonList": {
-#                                             "buttons": [
-#                                                 {
-#                                                     "text": "Sí",
-#                                                     "onClick": {
-#                                                         "action": {
-#                                                             "function": "createJiraTicket",
-#                                                             "parameters": [
-#                                                                 {
-#                                                                     "key": "messages",
-#                                                                     "value": json.dumps([
-#                                                                         {"role": "user", "content": pregunta}
-#                                                                     ])
-#                                                                 }
-#                                                             ]
-#                                                         }
-#                                                     }
-#                                                 }
-#                                             ]
-#                                         }
-#                                     }
-#                                 ]
-#                             }
-#                         ]
-#                     }
-#                 }
-#             ]
-#         }
-#     else:
-#         print("✅ Resuelto con embeddings (respuesta encontrada)")
-#         return { "text": resultado["respuesta"] }

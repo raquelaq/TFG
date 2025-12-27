@@ -14,7 +14,6 @@ from langchain_core.runnables import RunnableConfig
 
 from app.agents.support_graph import build_support_graph
 from app.agents.kb_graph import build_kb_graph
-from app.services.utils import delete_converation_cache
 from app.services.KnowledgeBaseFiltering import initialize_model_and_kb
 from app.services.auth import authenticate
 from app.agents.ticket_agent import TicketAgent
@@ -152,7 +151,6 @@ if st.session_state.role == "tech":
     pasos_raw = st.text_area("Pasos de resolución (uno por línea, en tono natural para el usuario)")
     pasos_list = [p.strip() for p in pasos_raw.split("\n") if p.strip()]
 
-    # Construimos diagnostic_steps con una estructura razonable
     diagnostic_steps = []
     for i, texto_paso in enumerate(pasos_list, start=1):
         diagnostic_steps.append({
@@ -385,89 +383,6 @@ if user_input:
         st.session_state.chat_history.append(
             {"role": "bot", "content": f"❌ Error: {e}"}
         )
-
-    # if st.session_state.modo_respuesta == "IA Generativa":
-    #     try:
-    #
-    #         bot_state = asyncio.run(
-    #             process_message(
-    #                 user_input,
-    #                 st.session_state.graph_state,
-    #                 st.session_state.active_graph
-    #             )
-    #         )
-    #
-    #         st.session_state.graph_state = bot_state
-    #
-    #         bot_response = bot_state.get("output", "Sin respuesta")
-    #         st.session_state.chat_history.append({"role": "bot", "content": bot_response})
-    #
-    #         out_flag = (bot_state.get("__output__") or "").lower()
-    #
-    #         if out_flag == "ticket" or "ticket" in bot_response.lower():
-    #             try:
-    #                 from app.agents.ticket_agent import TicketAgent
-    #
-    #                 messages = st.session_state.chat_history
-    #                 agent = TicketAgent(messages, user="ralmeidaquesada")
-    #
-    #                 ticket_contents = asyncio.run(agent.generate_ticket_contents())
-    #                 st.session_state.ticket_summary = ticket_contents["summary"]
-    #                 st.session_state.pendiente_crear_ticket = True
-    #
-    #             except Exception as e:
-    #                 st.session_state.ticket_summary = "No se pudo generar el resumen automáticamente."
-    #                 st.session_state.pendiente_crear_ticket = True
-    #
-    #         if any(x in bot_response.lower() for x in [
-    #             "hemos completado todos los pasos",
-    #             "incidencia resuelta",
-    #             "problema resuelto"
-    #         ]):
-    #             st.session_state.graph_state = {}
-    #             st.session_state.pendiente_crear_ticket = None
-    #
-    #     except Exception as e:
-    #         bot_response = f"Error de conexión: {e}"
-    #         st.session_state.chat_history.append({"role": "bot", "content": bot_response})
-    #
-    # else:
-    #     try:
-    #         response = requests.post(
-    #             "http://127.0.0.1:8000/message",
-    #             json={
-    #                 "type": "MESSAGE",
-    #                 "modo_respuesta": st.session_state.modo_respuesta,
-    #                 "message": {
-    #                     "text": user_input,
-    #                     "sender": {
-    #                         "email": "usuario_streamlit@local.test"
-    #                     }
-    #                 },
-    #                 "space": {"name": "chat-streamlit"}
-    #             }
-    #         )
-    #
-    #         resp_json = response.json()
-    #         bot_response = resp_json.get("text", "Error procesando la respuesta.")
-    #         st.session_state.chat_history.append({"role": "bot", "content": bot_response})
-    #
-    #         if resp_json.get("need_feedback"):
-    #             st.session_state.esperando_confirmacion = True
-    #             st.session_state.last_hybrid_query = user_input
-    #         else:
-    #             if (
-    #                 resp_json.get("ticket_suggested")
-    #                 or "no se encontró una solución" in bot_response.lower()
-    #                 or "no he encontrado una solución clara" in bot_response.lower()
-    #                 or "crear un ticket" in bot_response.lower()
-    #                 or "abrir un ticket" in bot_response.lower()
-    #             ):
-    #                 st.session_state.pendiente_crear_ticket = user_input
-    #
-    #     except Exception as e:
-    #         bot_response = f"Error de conexión: {e}"
-    #         st.session_state.chat_history.append({"role": "bot", "content": bot_response})
 
 
 for i, msg in enumerate(st.session_state.chat_history):

@@ -5,9 +5,8 @@ from ..config import GEMINI_API_KEY
 import google.generativeai as genai
 
 MAX_RETRIES = 5
-BACKOFF_BASE = 1  # segundos
+BACKOFF_BASE = 1
 
-# Configuración SDK
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.0-flash")
 

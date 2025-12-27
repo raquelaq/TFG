@@ -1,5 +1,3 @@
-import json
-from ..services.gemini import call_gemini_prompt
 from ..services import jira
 
 

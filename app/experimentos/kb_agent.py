@@ -1,7 +1,6 @@
 from datetime import datetime
 from app.services.gemini import call_gemini_llm
-from app.services.utils import read_kb_file
-from app.services.kb_json_loader import load_kb_from_json
+from app.experimentos.kb_json_loader import load_kb_from_json
 
 class KBResponseAgent:
     def __init__(self, chat_id, conversation):

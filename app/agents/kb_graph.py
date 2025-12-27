@@ -1,14 +1,10 @@
 from langgraph.graph import StateGraph, END
 from typing import TypedDict, List, Dict, Any
 from langsmith import traceable
-import json
 import os
 import json
-from langsmith import traceable
 
 from app.services.KnowledgeBaseFiltering import rebuild_embeddings
-
-KB_PATH = "app/data/KnowledgeBase.json"
 
 class KBState(TypedDict, total=False):
     id: str
@@ -19,11 +15,9 @@ class KBState(TypedDict, total=False):
     escalation_criteria: str
     keywords_tags: List[str]
 
-    # Salida
     output: str
     __output__: str
 
-# Ruta absoluta
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 KB_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "data", "KnowledgeBase.json"))
 
@@ -52,7 +46,6 @@ async def kb_manager_node(state: KBState) -> KBState:
             ),
         }
 
-    # Menú por defecto del panel técnico
     return {
         "__output__": "KBManager",
         "output": (
@@ -101,22 +94,18 @@ async def kb_save_entry_node(state: KBState) -> KBState:
     No es conversacional: recibe todos los campos desde Streamlit.
     """
 
-    # Aseguramos que existe el directorio app/data
     os.makedirs(os.path.dirname(KB_PATH), exist_ok=True)
 
-    # Si el fichero no existe, lo creamos con una lista vacía
     if not os.path.exists(KB_PATH):
         with open(KB_PATH, "w", encoding="utf-8") as f:
             json.dump([], f, indent=4, ensure_ascii=False)
 
-    # Cargar KB actual
     try:
         with open(KB_PATH, "r", encoding="utf-8") as f:
             kb_data = json.load(f)
     except Exception:
         kb_data = []
 
-    # Construir nueva entrada con la estructura que quieres
     new_entry = {
         "id": state["id"],
         "title": state["title"],
@@ -147,27 +136,3 @@ def build_kb_graph():
     graph.add_edge("KB_SaveEntry", END)
     graph.set_entry_point("KB_SaveEntry")
     return graph.compile()
-
-# def build_kb_graph():
-#     """
-#     Devuelve el grafo compilado para la gestión de la KB (técnicos).
-#     """
-#     graph = StateGraph(KBState)
-#
-#     graph.add_node("KBManager", kb_manager_node)
-#     graph.add_node("KB_CollectTitle", kb_collect_title_node)
-#     graph.add_node("KB_CollectDescription", kb_collect_description_node)
-#     graph.add_node("KB_CollectSymptoms", kb_collect_symptoms_node)
-#     graph.add_node("KB_SaveEntry", kb_save_entry_node)
-#
-#     # Los nodos se controlan con "__output__"
-#     graph.add_conditional_edges("KBManager", lambda s: s["__output__"])
-#     graph.add_conditional_edges("KB_CollectTitle", lambda s: s["__output__"])
-#     graph.add_conditional_edges("KB_CollectDescription", lambda s: s["__output__"])
-#     graph.add_conditional_edges("KB_CollectSymptoms", lambda s: s["__output__"])
-#     graph.add_conditional_edges("KB_SaveEntry", lambda s: s["__output__"])
-#
-#     graph.set_entry_point("KBManager")
-#     graph.add_edge("KB_SaveEntry", END)  # por si acaso
-#
-#     return graph.compile()
