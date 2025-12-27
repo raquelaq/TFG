@@ -22,14 +22,18 @@ from app.agents.ticket_agent import TicketAgent
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-initialize_model_and_kb("app/data/kb_embeddings.json")
-compiled_graph = build_support_graph()
+@st.cache_resource
+def load_support_graph():
+    return build_support_graph()
 
-SUPPORT_GRAPH = build_support_graph()
-KB_GRAPH = build_kb_graph()
+@st.cache_resource
+def load_kb_graph():
+    return build_kb_graph()
+
+SUPPORT_GRAPH = load_support_graph()
+KB_GRAPH = load_kb_graph()
 
 async def process_message(user_message: str, prev_state: dict, active_graph) -> dict:
-
     state = {
         **prev_state,
         "user_message": user_message,
