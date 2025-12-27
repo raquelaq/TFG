@@ -1,6 +1,6 @@
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from ..config import GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY
+from app.config import GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY
 
 SCOPES = ['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/drive']
 

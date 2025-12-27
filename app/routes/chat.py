@@ -1,27 +1,48 @@
-from fastapi import APIRouter, Request, Header, HTTPException
-from ..services.gemini import call_gemini_llm, call_gemini_prompt
-from ..services.google_docs import read_google_doc
-from ..services.jira import create_jira_ticket
-from ..services.utils import *
-from ..config import *
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
-from datetime import datetime
+from fastapi import APIRouter, Request, Header, Depends, HTTPException
 import urllib3
+import json
+import os
+from datetime import datetime
+
+from ..services.utils import *
+from ..agents.ticket_agent import TicketAgent
+from app.agents.support_graph import build_support_graph
+from ..services.KnowledgeBaseFiltering import *
+from ..agents.embedding_agent import responder_con_embeddings_custom
+from ..services.hybrid_search import buscar_hibrido
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-
+compiled_graph = build_support_graph()
 router = APIRouter()
 
 @router.get("/delete_cache")
 async def delete_cache(request: Request, api_key_info: dict = Depends(api_key_guard)):
-    # try:
-
         delete_converation_cache()
-        return {"message": "Cache deleted"}
-    # except Exception as e:
-    #     print("ERROR: ", str(e))
-    #     return {"message": "Error deleting cache"}
+
+@router.get("/delete_cache_user")
+async def delete_cache_user(
+        request: Request,
+        user_id: str,
+        api_key_info: dict = Depends(api_key_guard)
+):
+    try:
+        success = delete_conversation_cache_user(user=user_id)
+        print(success)
+
+        if success:
+            return {"message": f"Cache for user '{user_id}' deleted successfully."}
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Failed to delete cache for user '{user_id}'. User might not exist or file issues."
+            )
+
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        print("ERROR: ", str(e))
+        raise HTTPException(status_code=500, detail=f"Error deleting cache: {str(e)}")
     
 @router.post("/reload_kb")
 async def reload_kb(request: Request, api_key_info: dict = Depends(api_key_guard)):
@@ -29,11 +50,15 @@ async def reload_kb(request: Request, api_key_info: dict = Depends(api_key_guard
         data = await request.json()
         new_kb_content = data.get("content", "")
 
-
         if not new_kb_content:
             return {"message": "No content provided to update the knowledge base."}
         
         write_kb_file(new_kb_content)
+
+        if os.path.exists("app/data/kb_embeddings.json"):
+            os.remove("app/data/kb_embeddings.json")
+
+        initialize_model_and_kb("app/data/kb_embeddings.json")
 
         return {"message": "Knowledge base updated successfully."}
     
@@ -44,69 +69,190 @@ async def reload_kb(request: Request, api_key_info: dict = Depends(api_key_guard
 @router.post("/message")
 async def handle_message(request: Request, authorization: str = Header(None)):
     try:
-        # Step 1: Validate token
-        if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Missing or invalid token")
-
-        token = authorization.split(" ")[1]
-        claims = verify_google_chat_token(token, expected_audience=["974882915974", "478283974773"])
-        if not claims:
-            raise HTTPException(status_code=401, detail="Invalid Google token")
-
         data = await request.json()
         request_type = data.get("type")
 
         if request_type == "MESSAGE":
-            response = await respond_message(data)
+            #modo = data.get("modo_respuesta", "IA Generativa")
+            pregunta = data.get("message", {}).get("text")
+            usuario = (
+                data.get("message", {})
+                .get("sender", {})
+                .get("email", "usuario@local.test")
+                .split("@")[0]
+            )
+
+            modo_ui = data.get("modo_respuesta", "IA Generativa")
+
+            response_mode = (
+                "hybrid"
+                if modo_ui == "Modelo ML (embeddings)"
+                else "generative"
+            )
+
+            state = {
+                "user_message": pregunta,
+                "user_email": usuario,
+                "role": "user",
+                "response_mode": response_mode
+            }
+
+            result = await compiled_graph.ainvoke(state)
+
+            response_text = result.get("output", "")
+            solved = result.get("solved", False)
+
+            response_obj = {"text": response_text}
+            if not solved:
+                response_obj["cardsV2"] = [
+                    {
+                        "cardId": "helpOptions",
+                        "card": {
+                            "header": {
+                                "title": "¿Quieres que creemos un ticket para soporte?",
+                                "subtitle": "Tu incidencia será tratada con prioridad"
+                            },
+                            "sections": [
+                                {
+                                    "widgets": [
+                                        {
+                                            "buttonList": {
+                                                "buttons": [
+                                                    {
+                                                        "text": "Sí",
+                                                        "onClick": {
+                                                            "action": {
+                                                                "function": "createJiraTicket",
+                                                                "parameters": [
+                                                                    {
+                                                                        "key": "messages",
+                                                                        "value": json.dumps([
+                                                                            {
+                                                                                "role": "user",
+                                                                                "content": pregunta
+                                                                            }
+                                                                        ])
+                                                                    }
+                                                                ]
+                                                            }
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+
+            return response_obj
+
         elif request_type == "CARD_CLICKED":
             print("resolving card click")
             response = await onClick(data)
         else:
-            response = { "text": "Lo siento, ha ocurrido un error y no puedo ayudarte ahora mismo." }
-
-        return response
-
-
+            return {
+                "text": "Lo siento, ha ocurrido un error y no puedo ayudarte ahora mismo."
+            }
     except Exception as e:
         print("ERROR: ", str(e))
         return {
             "text": "Lo siento, ha ocurrido un error y no puedo ayudarte ahora mismo."
         }
 
-
+# -------------------------------------------------------------------
+# LEGACY FUNCTION (NOT USED)
+# This function belongs to an earlier architecture version where
+# the generative flow was implemented outside LangGraph.
+# It is kept for reference and comparison purposes.
+# -------------------------------------------------------------------
 async def respond_message(data):
     try:
         user_message = data.get("message", {}).get("text")
         chat_id = data.get("space", {}).get("name")
+        user_email = data.get("message", {}).get("sender").get("email")
 
-        conversation = get_conversation(chat_id)
+        # --- Semantic Filtering Step ---
+        start_filter = time.time()
+        print(f"Filtering relevant incidents for query: '{user_message}' (Chat ID: {chat_id}, User Email: {user_email})")
+        relevant_incidents = get_relevant_incidents_weighted_context(
+            user_email=user_email,
+            query=user_message,
+            top_n=10,
+            decay_factor=0.9
+        )
+        ids = []
+        if isinstance(relevant_incidents, list):
+            for e in relevant_incidents:
+                if isinstance(e, dict) and "id" in e:
+                    ids.append(e["id"])
+
+        print(ids)
+
+
+        conversation_total = get_conversation(user_email)
+
+        if isinstance(conversation_total, list):
+            conversation = conversation_total
+            incident_ids = []
+        elif isinstance(conversation_total, dict):
+            conversation = conversation_total.get("conversation", [])
+            incident_ids = conversation_total.get("Incidents", [])
+        else:
+            conversation = []
+            incident_ids = []
+
+# todo especificar que no escriba el llm_action
+        #       • Sigue los pasos dados para ayudar al usuario. No escribas todos los pasos en 1 solo mensaje, resuelvelo de forma iterativa
+        system_msg = {
+            "role": "system",
+            "content": f"""Actúa como un asistente de soporte informático que guía a los usuarios de negocio en las consultas más frecuentes.
+                1. Saludo y contexto  
+                   • Empieza cada conversación con un saludo creativo y una breve frase sobre los problemas que puedes resolver.
+
+                2. Guía de conocimiento  
+                   • Responde **exclusivamente** con la información contenida en la guía de soporte.
+                   Basado en el contexto de la conversación, la siguiente información de la base de conocimiento es la más pertinente: 
+                     \"\"\"{json.dumps(relevant_incidents, indent=4, ensure_ascii=False)}\"\"\"
+
+                3. Estilo y tono  
+                   • Habla siempre en **segunda persona del singular**.  
+                   • Mantén un tono cercano y amable.
+                   • Usa siempre listas con viñetas para que tu respuesta sea fácil de leer. Sin embargo, si me das pasos para resolver algo, envíalos en mensajes separados en lugar de usar viñetas dentro de un mismo mensaje.
+
+                4. Proceso de atención  
+                   • Si la guía no ofrece una solución directa o hay varias opciones, formula preguntas aclaratorias antes de proponer una solución -> en este caso devuelve `solved=true`.  
+                   • Cuando dispongas de la información necesaria, entrega la **solución completa**, paso a paso, sin omitir nada.
+
+                5. Formato de la respuesta  
+                   • Presenta los pasos en **viñetas o lista numerada** para mayor claridad.  
+                   • Al final del mensaje, añade una frase breve indicando que la solución proviene de la base de conocimiento.  
+                   • No cierres tu respuesta hasta haber incluido **todos** los pasos o las preguntas aclaratorias necesarias.
+
+                6. Casos no cubiertos  
+                   • Si el problema no aparece en la guía, responde únicamente:  
+                     “Lo siento, no puedo ayudarte a resolver este problema. Sí puedo ayudarte a abrir un ticket con soporte.”
+                   • Si el usuario dice específicamente que no ha podido resolver el problema pese a haber seguido los pasos:
+                     “Siento no haber podido ayudarte a resolver este problema. Si lo deseas puedo abrir un ticket por ti.”
+                   • En ambos casos devuelve `solved=false`.
+                   • Es posible que el usuario empieze una nueva conversación y te consulte sobre un problema diferente sin borrar caché. actúa de forma natural y ayúdale en ese caso
+
+                7. Indicador de estado  
+                   • Devuelve `solved=true` cuando proporciones una solución completa o sólo plantees preguntas aclaratorias.  
+                   • Devuelve `solved=false` cuando la base de conocimiento te lo indique, o siguiendo el punto 6.
+                   • Devuelve `solved=false` cuando hayas conseguido suficiente información en aquellas incidencias que indiquen que necesitan ser escaladas a soporte y responde unicamente:
+                    “Esta incidencia debe ser resuelta por soporte, usa el siguiente botón para enviar un ticket a soporte con un resumen de nuestra conversación”    """,
+
+            "timestamp": datetime.now().isoformat()
+
+        }
+
         if not conversation:
-            # guide_text = read_google_doc(ID_DRIVE_KB)
-            guide_text = read_kb_file()
-            system_msg = {
-                "role": "system",
-                "content": f"""Actúa como un guía para atender las peticiones más frecuentes que los usuarios de negocio hacen al departamento de soporte informático. 
-                                        Inicia la conversación saludando al usuario con una frase creativa y explicando de forma resumida qué consultas puedes resolver.
-                                        Responde a los usuarios utilizando la segunda persona del singular. 
-                                        Basa tus respuestas unicamente en esta guía de soporte:
-    
-                                        \"\"\"{guide_text}\"\"\"
-    
-                                        Usa un tono amigable y se ameno con los usuarios. Si no tienes claro que solución de la guía dar, hazle preguntas al usuario para aclarar
-                                        bien que problema tiene antes de responder con una solución. Si haces esto solved debe ser true, para no ofrecer ticket aún.
-    
-                                        Formatea perfectamente tus respuestas, utilizando viñetas si son necesarias para mejorar la claridad del mensaje.
-    
-                                        Si la respuesta no se encuentra en la guía responde que no puedes ayudarle a resolver ese problema, propón que creen un ticket para soporte y devuelve solved=false.
-                                        Sin embargo si el usuario no ha preguntado nada y no hay que responder a una pregunta devuelve siempre solved=true.
-    
-                                        Siempre que devuelvas solved=false, que el mensaje al usuario sea: "Lo siento, no puedo ayudarte a resolver este problema. Si que puedo ayudarte a abrir un ticket con soporte.
-    
-                                        Una vez respondas una respuesta que crees que es valida, explica que la respuesta está basada en lo encontrado en la base de conocimiento al principio del mensaje.""",
-                "timestamp": datetime.now().isoformat()
-
-            }
             conversation = [system_msg]
+        else:
+            conversation[0] = system_msg
 
         conversation.append({"role": "user", "content": user_message, "timestamp": datetime.now().isoformat()})
 
@@ -134,19 +280,22 @@ async def respond_message(data):
                 ]
             }
         ]
-
+        start_gemini = time.time()
         parsed_reply = await call_gemini_llm(conversation, tools)
+        print("Gemini: ", time.time() - start_gemini)
         response_text = convert_markdown_for_google_chat(parsed_reply["Response"])
         solved = parsed_reply["solved"]
-        print(parsed_reply)
+
+        # response_text += "<https://gemini.google.com/app/ebcac73292a98ac7?hl=es-ES|there>"
+
+        # response_text = r"{}".format(response_text)
 
         conversation.append({"role": "model", "content": parsed_reply["Response"], "timestamp": datetime.now().isoformat()})
-        save_conversation(chat_id, conversation)
+        save_conversation(user_email, {"conversation": conversation, "Incidents": [e["id"] for e in relevant_incidents]})
 
         response_obj = {"text": response_text}
 
         if not solved:
-            # Si no se resolvió, añadimos la card
             response_obj["cardsV2"] = [
                 {
                     "cardId": "helpOptions",
@@ -170,7 +319,6 @@ async def respond_message(data):
                                                                 {
                                                                     "key": "messages",
                                                                     "value": json.dumps(conversation[1:])
-                                                                    # desde el primer user message
                                                                 }
                                                             ]
                                                         }
@@ -195,88 +343,340 @@ async def respond_message(data):
         }
 
 
-
 async def onClick(data):
     try:
-        if data["action"]["actionMethodName"] == "createJiraTicket":
+        action = data["action"]["actionMethodName"]
+
+        if action == "createJiraTicket":
             params = data["common"]["parameters"]
             user = data["user"]["email"].split("@")[0]
             messages = json.loads(params["messages"])
 
-            ticket_info = await create_ticket_contents(messages)
-            title = ticket_info["title"]
-            summary = ticket_info["summary"]
+            agent = TicketAgent(messages, user)
+            ticket_result = await agent.create_ticket()
 
-            url = "https://soporte.satocan.com/rest/api/2/issue"
-            payload = {
-                "fields": {
-                    "project": {"key": "SDS"},
-                    "reporter": {"name": user},
-                    "summary": title,
-                    "description": summary,
-                    "issuetype": {"name": "Incidencia"},
-                    "labels": ["Ticketing"]
-                }
-            }
+            ticket_url = ticket_result["url"]
 
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": "Basic YXBpamlyYXVzZXI6TW1QWUVQeTd3bDhQTlRpaHhaZmM=",  # <-- tu token base64
-                "Cookie": "JSESSIONID=36C703B6C1A9F43882100C71BAB93960; atlassian.xsrf.token=BEGO-HDDW-ESA5-0LD2|9d03d9ee19bc09144abe7d6e463e4ad162f890a7|lin"
-            }
-            print(payload)
-
-            response = requests.post(url, headers=headers, data=json.dumps(payload), verify=False)
-            code = response.status_code
-            content = response.text
-
-            if 200 <= code < 300:
-                json_response = response.json()
-                ticket_key = json_response["key"]
-                ticket_url = f"https://soporte.satocan.com/browse/{ticket_key}"
-
-                response_obj = {
-                    "cardsV2": [
-                        {
-                            "cardId": "TicketCreated",
-                            "card": {
-                                "header": {
-                                    "title": "✅ Ticket creado correctamente"
-                                },
-                                "sections": [
-                                    {
-                                        "widgets": [
-                                            {
-                                                "buttonList": {
-                                                    "buttons": [
-                                                        {
-                                                            "text": "Ver ticket",
-                                                            "onClick": {
-                                                                "openLink": {
-                                                                    "url": ticket_url
-                                                                }
+            return {
+                "cardsV2": [
+                    {
+                        "cardId": "TicketCreated",
+                        "card": {
+                            "header": {
+                                "title": "✅ Ticket creado correctamente"
+                            },
+                            "sections": [
+                                {
+                                    "widgets": [
+                                        {
+                                            "buttonList": {
+                                                "buttons": [
+                                                    {
+                                                        "text": "Ver ticket",
+                                                        "onClick": {
+                                                            "openLink": {
+                                                                "url": ticket_url
                                                             }
                                                         }
-                                                    ]
-                                                }
+                                                    }
+                                                ]
                                             }
-                                        ]
-                                    }
-                                ]
-                            }
+                                        }
+                                    ]
+                                }
+                            ]
                         }
-                    ]
-                }
-                return response_obj
+                    }
+                ]
+            }
 
-            else:
-                return {
-                    "text": f"❌ Ocurrió un error al crear el ticket ({code}): {content}"
-                }
+        if action == "markSolved":
+            return {
+                "text": "¡Perfecto! Me alegra que hayas podido resolver la incidencia 😊.\n\nSi tienes cualquier otra duda o problema, no dudes en preguntarme."
+            }
 
     except Exception as e:
         return {
-            "text": f"❌ Error inesperado al crear el ticket: {str(e)}"
+            "text": f"❌ Error inesperado al procesar la acción: {str(e)}"
         }
 
+# async def responder_con_embeddings_ml(pregunta: str, usuario: str):
+#     resultados = buscar_hibrido(pregunta, alpha=0.25, top_k=1)
+#
+#     if not resultados:
+#         texto = (
+#             "No he encontrado una solución clara en la base de conocimiento para tu consulta. "
+#             "Si quieres, puedo ayudarte a crear un ticket para que soporte técnico lo revise."
+#         )
+#         return {
+#             "text": texto,
+#             "need_feedback": False,
+#             "ticket_suggested": True,
+#         }
+#
+#     mejor = resultados[0]
+#
+#     if len(resultados) > 1:
+#         delta = abs(resultados[0]["score_hybrid"] - resultados[1]["score_hybrid"])
+#         if delta < 0.05:
+#             return {
+#                 "text": (
+#                     "Tu consulta puede referirse a varios problemas distintos. "
+#                     "¿Podrías darme un poco más de contexto para ayudarte mejor?"
+#                 ),
+#                 "need_feedback": False,
+#                 "ticket_suggested": False,
+#             }
+#
+#     print(
+#         f"🔎 Hybrid scores | "
+#         f"hybrid={mejor['score_hybrid']:.3f} | "
+#         f"cosine={mejor['score_cosine']:.3f} | "
+#         f"bm25={mejor['score_bm25']:.3f}"
+#     )
+#
+#     if (
+#             mejor["score_cosine"] < MIN_COSINE_SIMILARITY
+#             or mejor["score_hybrid"] < MIN_HYBRID_SCORE
+#     ):
+#         return {
+#             "text": (
+#                 "No he encontrado una solución clara en la base de conocimiento para tu consulta. "
+#                 "¿Quieres que creemos un ticket para que soporte técnico lo revise?"
+#             ),
+#             "need_feedback": False,
+#             "ticket_suggested": True,
+#         }
+#
+#     incidente_id = mejor["id"]
+#
+#     with open(KB_PATH, "r", encoding="utf-8") as f:
+#         kb = json.load(f)
+#
+#     incidente = next((x for x in kb if x.get("id") == incidente_id), None)
+#
+#     if not incidente:
+#         return {
+#             "text": "He encontrado una coincidencia, pero no puedo cargar los detalles de la guía en la KB.",
+#             "need_feedback": False,
+#             "ticket_suggested": False,
+#         }
+#
+#     preguntas = incidente.get("questions_llm", [])
+#     pasos = incidente.get("resolution_guide_llm", {}).get("diagnostic_steps", [])
+#
+#     texto_final = f"{incidente.get('title', '(Sin título)')}\n\n"
+#
+#     if preguntas:
+#         texto_final += "**Preguntas iniciales:**\n"
+#         for p in preguntas:
+#             texto_final += f"- {p}\n"
+#         texto_final += "\n"
+#
+#     if pasos:
+#         texto_final += "**Pasos para resolver la incidencia:**\n\n"
+#         for i, step in enumerate(pasos, 1):
+#             titulo = (step.get("title") or "").strip()
+#             accion = (step.get("user_action") or "").strip()
+#
+#             if titulo:
+#                 texto_final += f"**Paso {i}: {titulo}**\n"
+#             else:
+#                 texto_final += f"**Paso {i}:**\n"
+#
+#             if accion:
+#                 texto_final += f"{accion}\n\n"
+#             else:
+#                 texto_final += "\n"
+#     else:
+#         texto_final += "⚠️ Esta incidencia no tiene pasos detallados en la guía.\n\n"
+#
+#     texto_final += "¿El problema quedó resuelto?"
+#
+#     # 4) Devolvemos texto + flag para que Streamlit pregunte Sí/No
+#     return {
+#         "text": texto_final,
+#         "need_feedback": True,
+#         "ticket_suggested": False,
+#     }
 
+
+
+# async def responder_con_embeddings_ml(pregunta: str, usuario: str):
+#     # Buscar en híbrido
+#     resultados = buscar_hibrido(pregunta, alpha=0.25, top_k=1)
+#
+#     # Si no hay resultados
+#     if not resultados or resultados[0]["score_hybrid"] < 0.40:
+#         return {
+#             "text": "No he encontrado una solución clara en la base de conocimiento. ¿Quieres que creemos un ticket?",
+#             "cardsV2": [
+#                 {
+#                     "cardId": "crearTicket",
+#                     "card": {
+#                         "header": {
+#                             "title": "¿Crear ticket de soporte?",
+#                             "subtitle": "Puedo generar un ticket con prioridad"
+#                         },
+#                         "sections": [{
+#                             "widgets": [{
+#                                 "buttonList": {
+#                                     "buttons": [{
+#                                         "text": "Crear ticket",
+#                                         "onClick": {
+#                                             "action": {
+#                                                 "function": "createJiraTicket",
+#                                                 "parameters": [
+#                                                     {
+#                                                         "key": "messages",
+#                                                         "value": json.dumps([
+#                                                             {"role": "user", "content": pregunta}
+#                                                         ])
+#                                                     }
+#                                                 ]
+#                                             }
+#                                         }
+#                                     }]
+#                                 }
+#                             }]
+#                         }]
+#                     }
+#                 }
+#             ]
+#         }
+#
+#     # Si hay resultado
+#     mejor = resultados[0]
+#     incidente_id = mejor["id"]
+#
+#     # Cargar KB para obtener pasos
+#     with open("app/data/KnowledgeBase.json", "r", encoding="utf-8") as f:
+#         kb = json.load(f)
+#
+#     incidente = next((x for x in kb if x["id"] == incidente_id), None)
+#
+#     if not incidente:
+#         return {"text": "Error interno: la incidencia seleccionada no existe en la KB."}
+#
+#     pasos = incidente.get("resolution_guide_llm", {}).get("diagnostic_steps", [])
+#     preguntas = incidente.get("questions_llm", [])
+#
+#     texto_final = f"📘 **Guía encontrada:** {incidente['title']}\n\n"
+#
+#     # Agregar preguntas iniciales
+#     if preguntas:
+#         texto_final += "**Preguntas iniciales:**\n"
+#         for p in preguntas:
+#             texto_final += f"- {p}\n"
+#         texto_final += "\n"
+#
+#     # Agregar pasos
+#     if pasos:
+#         texto_final += "**Pasos para resolver la incidencia:**\n"
+#         for i, step in enumerate(pasos, 1):
+#             titulo = step.get("title", "")
+#             accion = step.get("user_action", "")
+#             texto_final += f"**Paso {i}: {titulo}**\n{accion}\n\n"
+#     else:
+#         texto_final += "⚠️ La incidencia no tiene pasos definidos.\n\n"
+#
+#     # Pregunta final
+#     texto_final += "---\n¿El problema quedó resuelto?"
+#
+#     # Guardamos en conversación estado pendiente de confirmación
+#     return {
+#         "text": texto_final,
+#         "cardsV2": [
+#             {
+#                 "cardId": "confirmation",
+#                 "card": {
+#                     "header": { "title": "¿Se solucionó la incidencia?" },
+#                     "sections": [{
+#                         "widgets": [{
+#                             "buttonList": {
+#                                 "buttons": [
+#                                     {
+#                                         "text": "Sí, solucionado",
+#                                         "onClick": {
+#                                             "action": {
+#                                                 "function": "markSolved",
+#                                                 "parameters": []
+#                                             }
+#                                         }
+#                                     },
+#                                     {
+#                                         "text": "No, seguir con ticket",
+#                                         "onClick": {
+#                                             "action": {
+#                                                 "function": "createJiraTicket",
+#                                                 "parameters": [
+#                                                     {
+#                                                         "key": "messages",
+#                                                         "value": json.dumps([
+#                                                             {"role": "user", "content": pregunta}
+#                                                         ])
+#                                                     }
+#                                                 ]
+#                                             }
+#                                         }
+#                                     }
+#                                 ]
+#                             }
+#                         }]
+#                     }]
+#                 }
+#             }
+#         ]
+#     }
+
+
+# async def responder_con_embeddings_ml(pregunta: str, usuario: str):
+#     resultado = responder_con_embeddings_custom(pregunta)
+#
+#     if not resultado["solved"]:
+#         print("✅ Resuelto con embeddings (sin solución, esperando confirmación de ticket)")
+#         return {
+#             "text": resultado["respuesta"],
+#             "cardsV2": [
+#                 {
+#                     "cardId": "helpOptions",
+#                     "card": {
+#                         "header": {
+#                             "title": "¿Quieres que creemos un ticket para soporte?",
+#                             "subtitle": "Al haber utilizado este canal, tu ticket será tratado de forma prioritaria"
+#                         },
+#                         "sections": [
+#                             {
+#                                 "widgets": [
+#                                     {
+#                                         "buttonList": {
+#                                             "buttons": [
+#                                                 {
+#                                                     "text": "Sí",
+#                                                     "onClick": {
+#                                                         "action": {
+#                                                             "function": "createJiraTicket",
+#                                                             "parameters": [
+#                                                                 {
+#                                                                     "key": "messages",
+#                                                                     "value": json.dumps([
+#                                                                         {"role": "user", "content": pregunta}
+#                                                                     ])
+#                                                                 }
+#                                                             ]
+#                                                         }
+#                                                     }
+#                                                 }
+#                                             ]
+#                                         }
+#                                     }
+#                                 ]
+#                             }
+#                         ]
+#                     }
+#                 }
+#             ]
+#         }
+#     else:
+#         print("✅ Resuelto con embeddings (respuesta encontrada)")
+#         return { "text": resultado["respuesta"] }
