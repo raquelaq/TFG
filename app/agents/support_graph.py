@@ -63,18 +63,25 @@ async def generative_agent_node(state: SupportState) -> Command:
     def _coerce_role(r: str) -> str:
         return "user" if r == "user" else "model"
 
-    prev_clean = []
-    for m in prev:
-        if m.get("role") == "system":
-            continue
-        prev_clean.append({
+    prev_clean = [{
             "role": _coerce_role(m.get("role", "user")),
-            "content": m.get("content", ""),
-            "timestamp": m.get("timestamp")
-        })
+            "content": m.get("content", "")
+        }
+        for m in prev
+        if m.get("role") != "system"
+    ]
 
-    if not isinstance(relevant_incidents, list):
-        relevant_incidents = []
+    # for m in prev:
+    #     if m.get("role") == "system":
+    #         continue
+    #     prev_clean.append({
+    #         "role": _coerce_role(m.get("role", "user")),
+    #         "content": m.get("content", ""),
+    #         "timestamp": m.get("timestamp")
+    #     })
+
+    # if not isinstance(relevant_incidents, list):
+    #     relevant_incidents = []
 
     system_msg = {
         "role": "system",
@@ -117,56 +124,97 @@ async def generative_agent_node(state: SupportState) -> Command:
         "timestamp": datetime.now().isoformat()
     }
 
-    conversation = [system_msg] + prev_clean
-
-    conversation.append({
+    conversation = [system_msg] + prev_clean + [{
         "role": "user",
-        "content": user_message,
-        "timestamp": datetime.now().isoformat()
-    })
-
-    tools = [{
-        "function_declarations": [{
-            "name": "return_json_response",
-            "description": "Devuelve una respuesta como JSON con 'Response' y 'solved'",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "Response": {"type": "string"},
-                    "solved": {"type": "boolean"}
-                },
-                "required": ["Response", "solved"]
-            }
-        }]
+        "content": user_message
     }]
 
-    parsed = await call_gemini_llm(conversation, tools)
-    if isinstance(parsed, dict):
-        response_text = convert_markdown_for_google_chat(parsed.get("Response", ""))
-        solved = bool(parsed.get("solved", False))
-    else:
-        response_text = convert_markdown_for_google_chat(str(parsed))
-        solved = False
+    # conversation.append({
+    #     "role": "user",
+    #     "content": user_message,
+    #     "timestamp": datetime.now().isoformat()
+    # })
 
-    conversation.append({
-        "role": "model",
-        "content": response_text,
-        "timestamp": datetime.now().isoformat()
-    })
+    # tools = [{
+    #     "function_declarations": [{
+    #         "name": "return_json_response",
+    #         "description": "Devuelve una respuesta como JSON con 'Response' y 'solved'",
+    #         "parameters": {
+    #             "type": "object",
+    #             "properties": {
+    #                 "Response": {"type": "string"},
+    #                 "solved": {"type": "boolean"}
+    #             },
+    #             "required": ["Response", "solved"]
+    #         }
+    #     }]
+    # }]
 
-    incident_ids = []
+    parsed = await call_gemini_llm(conversation)
 
-    if isinstance(relevant_incidents, list):
-        for e in relevant_incidents:
-            if isinstance(e, dict) and "id" in e:
-                incident_ids.append(e["id"])
+    response_text = convert_markdown_for_google_chat(
+        parsed.get("Response", "")
+        if isinstance(parsed, dict)
+        else str(parsed)
+    )
+
+    ticket_phrases = [
+        "no puedo ayudarte",
+        "abrir un ticket",
+        "soporte",
+        "no aparece en la base"
+    ]
+
+    needs_ticket = any(p in response_text.lower() for p in ticket_phrases)
+
+    update = {
+        "output": response_text,
+        "solved": not needs_ticket
+    }
+
+    if needs_ticket:
+        update["action"] = "ticket"
 
     save_conversation(
         user_email,
-        {"conversation": conversation, "Incidents": incident_ids}
+        {
+            "conversation": conversation + [{
+                "role": "model",
+                "content": response_text
+            }],
+            "Incidents": [e["id"] for e in relevant_incidents if "id" in e]
+        }
     )
 
-    return Command(goto=END, update={"output": response_text, "solved": True})
+    return Command(goto=END, update=update)
+
+    # parsed = await call_gemini_llm(conversation, tools)
+    # if isinstance(parsed, dict):
+    #     response_text = convert_markdown_for_google_chat(parsed.get("Response", ""))
+    #     solved = bool(parsed.get("solved", False))
+    # else:
+    #     response_text = convert_markdown_for_google_chat(str(parsed))
+    #     solved = False
+    #
+    # conversation.append({
+    #     "role": "model",
+    #     "content": response_text,
+    #     "timestamp": datetime.now().isoformat()
+    # })
+    #
+    # incident_ids = []
+    #
+    # if isinstance(relevant_incidents, list):
+    #     for e in relevant_incidents:
+    #         if isinstance(e, dict) and "id" in e:
+    #             incident_ids.append(e["id"])
+    #
+    # save_conversation(
+    #     user_email,
+    #     {"conversation": conversation, "Incidents": incident_ids}
+    # )
+    #
+    # return Command(goto=END, update={"output": response_text, "solved": True})
 
 
 @traceable(name="HybridResponse")

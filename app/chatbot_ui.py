@@ -132,7 +132,6 @@ if st.session_state.role == "tech":
 
     st.write("### ➕ Nueva entrada en la KB")
 
-    # Campos principales
     new_id = st.text_input("ID único de la incidencia", value=f"INC_{st.session_state.user_email}_1")
     title = st.text_input("Título de la incidencia")
     description = st.text_area("Descripción del problema")
@@ -406,56 +405,49 @@ for i, msg in enumerate(st.session_state.chat_history):
                 unsafe_allow_html=True
             )
 
-        if (
-            "pendiente_crear_ticket" in st.session_state
-            and st.session_state.pendiente_crear_ticket
-            and i == len(st.session_state.chat_history) - 1
-            and any(x in msg["content"].lower() for x in [
-                "ticket", "no puedo ayudarte", "no se encontró una solución"
-            ])
-        ):
-            with st.expander("Crear ticket de soporte"):
-                with st.form("ticket_form"):
-                    descripcion = st.text_area(
-                        "Descripción del problema (lo puedes editar si lo consideras necesario)",
-                        value=st.session_state.get("ticket_summary", "")
+if st.session_state.get("pendiente_crear_ticket"):
+
+    with st.expander("Crear ticket de soporte", expanded=True):
+        with st.form(key="ticket_form_unico"):
+
+            descripcion = st.text_area(
+                "Descripción del problema",
+                value=st.session_state.get("ticket_summary", "")
+            )
+
+            imagen = st.file_uploader(
+                "Adjuntar imagen (opcional)",
+                type=["png", "jpg", "jpeg"]
+            )
+
+            submitted = st.form_submit_button("Enviar ticket")
+
+            if submitted:
+                try:
+                    agent = TicketAgent(
+                        [{"role": "user", "content": descripcion}],
+                        user=st.session_state.user_email
                     )
-                    imagen = st.file_uploader(
-                        "Adjuntar imagen (opcional)",
-                        type=["png", "jpg", "jpeg"]
+
+                    ticket_result = asyncio.run(
+                        agent.create_ticket(image_path=None)
                     )
-                    submitted = st.form_submit_button("Enviar ticket")
 
-                    if submitted:
-                        image_path = None
-                        if imagen is not None:
-                            image_path = f"temp_{imagen.name}"
-                            with open(image_path, "wb") as f:
-                                f.write(imagen.getbuffer())
+                    st.session_state.chat_history.append({
+                        "role": "bot",
+                        "content": "✅ Ticket creado correctamente.",
+                        "url": ticket_result["url"]
+                    })
 
-                        try:
-                            from app.agents.ticket_agent import TicketAgent
-                            import asyncio
-                            if sys.platform.startswith("win"):
-                                asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+                    st.session_state.pendiente_crear_ticket = False
+                    st.session_state.graph_state = {}
 
-                            messages = [{"role": "user", "content": descripcion}]
-                            agent = TicketAgent(messages, user="ralmeidaquesada")
-                            ticket_result = asyncio.run(agent.create_ticket(image_path=image_path))
+                    st.success(f"Ticket enviado a JIRA. ID: {ticket_result['key']}")
 
-                            ticket_url = ticket_result["url"]
-                            st.session_state.chat_history.append({
-                                "role": "bot",
-                                "content": f"Ticket creado en JIRA",
-                                "url": ticket_result["url"]
-                            })
-                            st.link_button("🔗 Abrir ticket en JIRA", ticket_url)
-                            st.session_state.pendiente_crear_ticket = None
-                            st.success(f"Ticket enviado a JIRA correctamente. ID: {ticket_result['key']}")
-                            st.session_state.graph_state = {}
+                    st.rerun()
 
-                        except Exception as e:
-                            st.error(f"❌ Error enviando ticket a JIRA: {e}")
+                except Exception as e:
+                    st.error(f"❌ Error enviando ticket a JIRA: {e}")
 
 
 if st.session_state.get("esperando_confirmacion"):
