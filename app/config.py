@@ -2,10 +2,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+from pathlib import Path
 from configparser import ConfigParser
 import json
 
 #if os.path.exists('config.ini'):
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+APP_DIR = PROJECT_ROOT / "app"
+DATA_DIR = APP_DIR / "data"
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.ini')
 
@@ -33,8 +38,12 @@ else:
 
 
 if os.path.exists("api_keys.json"):
-    with open("api_keys.json", "r") as f:
-        API_KEYS = json.load(f)
-
+    try:
+        with open("api_keys.json", "r", encoding="utf-8") as f:
+            API_KEYS = json.load(f)
+    except json.JSONDecodeError:
+        print("❌ api_keys.json corrupto")
+        API_KEYS = {}
 else:
     API_KEYS = json.loads(os.getenv("API_KEYS", "{}"))
+

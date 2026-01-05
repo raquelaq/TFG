@@ -6,11 +6,12 @@ import time
 import os
 import torch
 from ..config import *
+from app.config import DATA_DIR
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KB_PATH = os.path.join(BASE_DIR, "data", "KnowledgeBase.json")
 
-EMBEDDING_CACHE_FILE = "../data/kb_embeddings.json"
+EMBEDDING_CACHE_FILE = str(DATA_DIR / "kb_embeddings.json")
 DEFAULT_MODEL_NAME = 'multi-qa-mpnet-base-dot-v1'
 
 model: Optional[SentenceTransformer] = None

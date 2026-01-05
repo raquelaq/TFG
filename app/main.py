@@ -8,6 +8,7 @@ import json
 from fastapi import FastAPI
 from app.routes.chat import router as chat_router
 from app.services.KnowledgeBaseFiltering import initialize_model_and_kb
+from app.config import DATA_DIR
 
 #if os.path.exists('config.ini'):
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.ini')
@@ -35,13 +36,17 @@ else:
 
 
 if os.path.exists("api_keys.json"):
-    with open("api_keys.json", "r") as f:
-        API_KEYS = json.load(f)
-
+    try:
+        with open("api_keys.json", "r", encoding="utf-8") as f:
+            API_KEYS = json.load(f)
+    except json.JSONDecodeError:
+        print("❌ api_keys.json corrupto")
+        API_KEYS = {}
 else:
     API_KEYS = json.loads(os.getenv("API_KEYS", "{}"))
 
-initialize_model_and_kb("app/data/kb_embeddings.json")
+
+initialize_model_and_kb(str(DATA_DIR / "kb_embeddings.json"))
 
 # Crear instancia FastAPI
 app = FastAPI(

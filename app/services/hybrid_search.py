@@ -50,8 +50,14 @@ def initialize_hybrid_search():
     if not os.path.exists(KB_PATH):
         raise FileNotFoundError(f"No se encontró la KB en {KB_PATH}")
 
-    with open(KB_PATH, "r", encoding="utf-8") as f:
-        kb = json.load(f)
+    try:
+        with open(KB_PATH, "r", encoding="utf-8") as f:
+            kb = json.load(f)
+            if not isinstance(kb, list):
+                kb = []
+    except json.JSONDecodeError:
+        print("❌ KB corrupta en hybrid_search")
+        kb = []
 
     kb_filtrada = [
         item for item in kb

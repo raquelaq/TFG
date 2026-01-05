@@ -7,10 +7,19 @@ KB_EMBEDDINGS_PATH = "app/data/kb_embeddings.json"
 
 
 def load_kb():
-    if os.path.exists(KB_PATH):
+    if not os.path.exists(KB_PATH):
+        return []
+
+    try:
         with open(KB_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+            data = json.load(f)
+            return data if isinstance(data, list) else []
+    except json.JSONDecodeError:
+        print("❌ KB corrupta, devolviendo lista vacía")
+        return []
+    except Exception as e:
+        print(f"❌ Error cargando KB: {e}")
+        return []
 
 
 def save_kb(data):

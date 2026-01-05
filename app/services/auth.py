@@ -6,9 +6,16 @@ USERS_FILE = os.path.join(BASE_DIR, "..", "data", "users.json")
 USERS_FILE = os.path.normpath(USERS_FILE)
 
 def load_users():
-    with open(USERS_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data["users"]
+    try:
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("users", [])
+    except json.JSONDecodeError:
+        print("❌ users.json corrupto")
+        return []
+    except Exception as e:
+        print(f"❌ Error cargando usuarios: {e}")
+        return []
 
 
 def authenticate(email: str, password: str):

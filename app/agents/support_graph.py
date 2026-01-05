@@ -5,6 +5,7 @@ from langsmith import traceable
 from datetime import datetime
 import json
 
+from app.config import DATA_DIR
 from app.services.gemini import call_gemini_llm
 from app.services.utils import get_conversation, save_conversation, convert_markdown_for_google_chat
 from app.services.KnowledgeBaseFiltering import get_relevant_incidents_weighted_context
@@ -28,6 +29,7 @@ class SupportState(TypedDict, total=False):
 
 @traceable(name="RouteByResponseMode")
 async def route_by_response_mode(state: SupportState) -> Command:
+    state["trace"] = f"routing:{state.get('response_mode')}"
     if state.get("role") == "tech":
         return Command(goto="KBManager")
 
@@ -47,11 +49,13 @@ async def generative_agent_node(state: SupportState) -> Command:
     )
 
     if not relevant_incidents:
-        msg = "No he encontrado nada en la base de conocimiento. ¿Quieres que creemos un ticket?"
         return Command(
             goto=END,
             update={
-                "output": msg,
+                "output": (
+                    "No he encontrado una solución en la base de conocimiento para tu consulta. "
+                    "Si lo deseas, puedo ayudarte a crear un ticket para soporte técnico."
+                ),
                 "solved": False,
                 "action": "ticket"
             }
@@ -63,25 +67,14 @@ async def generative_agent_node(state: SupportState) -> Command:
     def _coerce_role(r: str) -> str:
         return "user" if r == "user" else "model"
 
-    prev_clean = [{
+    prev_clean = [
+        {
             "role": _coerce_role(m.get("role", "user")),
             "content": m.get("content", "")
         }
         for m in prev
         if m.get("role") != "system"
     ]
-
-    # for m in prev:
-    #     if m.get("role") == "system":
-    #         continue
-    #     prev_clean.append({
-    #         "role": _coerce_role(m.get("role", "user")),
-    #         "content": m.get("content", ""),
-    #         "timestamp": m.get("timestamp")
-    #     })
-
-    # if not isinstance(relevant_incidents, list):
-    #     relevant_incidents = []
 
     system_msg = {
         "role": "system",
@@ -100,12 +93,11 @@ async def generative_agent_node(state: SupportState) -> Command:
                    • Usa siempre listas con viñetas para que tu respuesta sea fácil de leer. Sin embargo, si me das pasos para resolver algo, envíalos en mensajes separados en lugar de usar viñetas dentro de un mismo mensaje.
 
                 4. Proceso de atención  
-                   • Si la guía no ofrece una solución directa o hay varias opciones, formula preguntas aclaratorias antes de proponer una solución -> en este caso devuelve `solved=true`.  
+                   • Si la guía no ofrece una solución directa o hay varias opciones, formula preguntas aclaratorias antes de proponer una solución.  
                    • Cuando dispongas de la información necesaria, entrega la **solución completa**, paso a paso, sin omitir nada.
 
                 5. Formato de la respuesta  
-                   • Presenta los pasos en **viñetas o lista numerada** para mayor claridad.  
-                   • Al final del mensaje, añade una frase breve indicando que la solución proviene de la base de conocimiento.  
+                   • Presenta los pasos en **viñetas o lista numerada** para mayor claridad.    
                    • No cierres tu respuesta hasta haber incluido **todos** los pasos o las preguntas aclaratorias necesarias.
 
                 6. Casos no cubiertos  
@@ -113,14 +105,8 @@ async def generative_agent_node(state: SupportState) -> Command:
                      “Lo siento, no puedo ayudarte a resolver este problema. Sí puedo ayudarte a abrir un ticket con soporte.”
                    • Si el usuario dice específicamente que no ha podido resolver el problema pese a haber seguido los pasos:
                      “Siento no haber podido ayudarte a resolver este problema. Si lo deseas puedo abrir un ticket por ti.”
-                   • En ambos casos devuelve `solved=false`.
-                   • Es posible que el usuario empieze una nueva conversación y te consulte sobre un problema diferente sin borrar caché. actúa de forma natural y ayúdale en ese caso
-
-                7. Indicador de estado  
-                   • Devuelve `solved=true` cuando proporciones una solución completa o sólo plantees preguntas aclaratorias.  
-                   • Devuelve `solved=false` cuando la base de conocimiento te lo indique, o siguiendo el punto 6.
-                   • Devuelve `solved=false` cuando hayas conseguido suficiente información en aquellas incidencias que indiquen que necesitan ser escaladas a soporte y responde unicamente:
-                    “Esta incidencia debe ser resuelta por soporte, usa el siguiente botón para enviar un ticket a soporte con un resumen de nuestra conversación”    """,
+    
+                   • Es posible que el usuario empieze una nueva conversación y te consulte sobre un problema diferente sin borrar caché. actúa de forma natural y ayúdale en ese caso    """,
         "timestamp": datetime.now().isoformat()
     }
 
@@ -128,27 +114,6 @@ async def generative_agent_node(state: SupportState) -> Command:
         "role": "user",
         "content": user_message
     }]
-
-    # conversation.append({
-    #     "role": "user",
-    #     "content": user_message,
-    #     "timestamp": datetime.now().isoformat()
-    # })
-
-    # tools = [{
-    #     "function_declarations": [{
-    #         "name": "return_json_response",
-    #         "description": "Devuelve una respuesta como JSON con 'Response' y 'solved'",
-    #         "parameters": {
-    #             "type": "object",
-    #             "properties": {
-    #                 "Response": {"type": "string"},
-    #                 "solved": {"type": "boolean"}
-    #             },
-    #             "required": ["Response", "solved"]
-    #         }
-    #     }]
-    # }]
 
     parsed = await call_gemini_llm(conversation)
 
@@ -158,63 +123,38 @@ async def generative_agent_node(state: SupportState) -> Command:
         else str(parsed)
     )
 
-    ticket_phrases = [
-        "no puedo ayudarte",
-        "abrir un ticket",
-        "soporte",
-        "no aparece en la base"
-    ]
-
-    needs_ticket = any(p in response_text.lower() for p in ticket_phrases)
-
-    update = {
-        "output": response_text,
-        "solved": not needs_ticket
-    }
-
-    if needs_ticket:
-        update["action"] = "ticket"
+    llm_solved = parsed.get("solved", True)
 
     save_conversation(
         user_email,
         {
-            "conversation": conversation + [{
-                "role": "model",
-                "content": response_text
-            }],
-            "Incidents": [e["id"] for e in relevant_incidents if "id" in e]
+            "conversation": conversation + [
+                {"role": "model", "content": response_text}
+            ],
+            "Incidents": [
+                e["id"] for e in relevant_incidents if "id" in e
+            ]
         }
     )
 
-    return Command(goto=END, update=update)
+    if not llm_solved:
+        return Command(
+            goto=END,
+            update={
+                "output": response_text,
+                "solved": False,
+                "action": "ticket"
+            }
+        )
 
-    # parsed = await call_gemini_llm(conversation, tools)
-    # if isinstance(parsed, dict):
-    #     response_text = convert_markdown_for_google_chat(parsed.get("Response", ""))
-    #     solved = bool(parsed.get("solved", False))
-    # else:
-    #     response_text = convert_markdown_for_google_chat(str(parsed))
-    #     solved = False
-    #
-    # conversation.append({
-    #     "role": "model",
-    #     "content": response_text,
-    #     "timestamp": datetime.now().isoformat()
-    # })
-    #
-    # incident_ids = []
-    #
-    # if isinstance(relevant_incidents, list):
-    #     for e in relevant_incidents:
-    #         if isinstance(e, dict) and "id" in e:
-    #             incident_ids.append(e["id"])
-    #
-    # save_conversation(
-    #     user_email,
-    #     {"conversation": conversation, "Incidents": incident_ids}
-    # )
-    #
-    # return Command(goto=END, update={"output": response_text, "solved": True})
+    return Command(
+        goto=END,
+        update={
+            "output": response_text,
+            "solved": True,
+            "action": "none"
+        }
+    )
 
 
 @traceable(name="HybridResponse")
@@ -306,7 +246,7 @@ async def kb_manager_node(state: SupportState) -> Command:
     )
 
 def build_support_graph():
-    initialize_model_and_kb("app/data/kb_embeddings.json")
+    initialize_model_and_kb(str(DATA_DIR / "kb_embeddings.json"))
 
     graph = StateGraph(SupportState)
 

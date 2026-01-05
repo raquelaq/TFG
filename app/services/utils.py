@@ -26,24 +26,36 @@ def convert_markdown_for_google_chat(text: str) -> str:
     return text
 
 def get_conversation(chat_id: str):
-    if os.path.exists(KB_PATH):
-        with open(CONVERSATION_STORE_PATH, 'r') as f:
-            try:
-                data = json.load(f)
-            except json.JSONDecodeError:
-                data = {}
+    if not os.path.exists(CONVERSATION_STORE_PATH):
+        return []
+
+    try:
+        with open(CONVERSATION_STORE_PATH, 'r', encoding='utf-8') as f:
+            data = json.load(f)
             return data.get(chat_id, [])
-    return []
+    except json.JSONDecodeError:
+        print("❌ conversation_store.json corrupto")
+        return []
+
 
 def save_conversation(chat_id: str, conversation):
-    if os.path.exists(KB_PATH):
-        with open(CONVERSATION_STORE_PATH, 'r') as f:
+    os.makedirs(os.path.dirname(CONVERSATION_STORE_PATH), exist_ok=True)
+
+    try:
+        with open(CONVERSATION_STORE_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
-    else:
+            if not isinstance(data, dict):
+                data = {}
+    except Exception:
         data = {}
+
     data[chat_id] = conversation
-    with open(CONVERSATION_STORE_PATH, 'w') as f:
+
+    tmp_path = CONVERSATION_STORE_PATH + ".tmp"
+    with open(tmp_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
+
+    os.replace(tmp_path, CONVERSATION_STORE_PATH)
 
 def delete_converation_cache():
     if os.path.exists(KB_PATH):

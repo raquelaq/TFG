@@ -314,7 +314,14 @@ async def onClick(data):
         if action == "createJiraTicket":
             params = data["common"]["parameters"]
             user = data["user"]["email"].split("@")[0]
-            messages = json.loads(params["messages"])
+            #messages = json.loads(params["messages"])
+            try:
+                messages = json.loads(params["messages"])
+                if not isinstance(messages, list):
+                    messages = []
+            except json.JSONDecodeError:
+                print("❌ messages no es JSON válido")
+                messages = []
 
             agent = TicketAgent(messages, user)
             ticket_result = await agent.create_ticket()

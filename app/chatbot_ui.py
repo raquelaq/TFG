@@ -12,6 +12,7 @@ nest_asyncio.apply()
 import requests
 from langchain_core.runnables import RunnableConfig
 
+from app.config import DATA_DIR
 from app.agents.support_graph import build_support_graph
 from app.agents.kb_graph import build_kb_graph
 from app.services.KnowledgeBaseFiltering import initialize_model_and_kb
@@ -114,8 +115,7 @@ if not st.session_state.logged_in:
                 st.session_state.active_graph = SUPPORT_GRAPH
             else:
                 st.session_state.active_graph = KB_GRAPH
-                initialize_model_and_kb("app/data/kb_embeddings.json", force_reload=True)
-
+                initialize_model_and_kb(str(DATA_DIR / "kb_embeddings.json"), force_reload=True)
             st.rerun()
 
     st.stop()
@@ -193,7 +193,7 @@ if st.session_state.role == "tech":
                 )
             )
             st.success(out.get("output", "✅ Entrada procesada correctamente."))
-            initialize_model_and_kb("app/data/kb_embeddings.json", force_reload=True)
+            initialize_model_and_kb(str(DATA_DIR / "kb_embeddings.json"), force_reload=True)
 
         except Exception as e:
             st.error(f"❌ Error guardando la entrada: {e}")
@@ -204,7 +204,7 @@ if st.session_state.role == "tech":
             initialize_model_and_kb
         )
 
-        initialize_model_and_kb("app/data/kb_embeddings.json")
+        initialize_model_and_kb(str(DATA_DIR / "kb_embeddings.json"))
 
         if not KB_CORPUS_DATA:
             st.warning("La base de conocimiento está vacía.")
@@ -303,18 +303,30 @@ body {
 
 st.caption(f"Sesión iniciada como: **{st.session_state.user_email}**")
 
-if st.sidebar.button("Cerrar sesión"):
-    st.session_state.clear()
-    st.rerun()
-
 st.caption("Cuéntame tu incidencia y trataré de ayudarte")
 
 st.sidebar.title("Instrucciones")
 st.sidebar.markdown("""
 - Describe tu problema con claridad.
-- Este asistente es automático.
-- Puedes usar modo IA generativa o modo modelo ML (híbrido).
+- Puedes elegir entre IA generativa o modelo ML (híbrido).
+- Sigue las indicaciones del asistente paso a paso.
+- Si no se resuelve, podrás crear un ticket de soporte.
 """)
+
+if st.sidebar.button("Cerrar sesión"):
+    st.session_state.clear()
+    st.rerun()
+
+if st.sidebar.button("Reiniciar conversación"):
+    st.session_state.graph_state = {}
+    st.session_state.chat_history = []  # 🔥 CLAVE
+    st.session_state.esperando_confirmacion = False
+    st.session_state.pendiente_crear_ticket = None
+
+    from app.services.utils import delete_conversation_cache_user
+    delete_conversation_cache_user(user=st.session_state.user_email)
+
+    st.rerun()
 
 if "modo_respuesta" not in st.session_state:
     st.session_state.modo_respuesta = "IA Generativa"
@@ -326,14 +338,15 @@ modo = st.radio(
 )
 st.session_state.modo_respuesta = modo
 
-if st.sidebar.button("Reiniciar conversación"):
-    st.session_state.graph_state = {}
-    st.session_state.chat_history.append({
-        "role": "bot",
-        "content": "Ok, empezamos de cero. ¿Qué incidencia tienes ahora?"
-    })
-    st.session_state.esperando_confirmacion = False
-    st.session_state.pendiente_crear_ticket = None
+# if st.sidebar.button("Reiniciar conversación"):
+#     st.session_state.graph_state = {}
+#     st.session_state.chat_history.append({
+#         "role": "bot",
+#         "content": "Ok, empezamos de cero. ¿Qué incidencia tienes ahora?"
+#     })
+#     st.session_state.esperando_confirmacion = False
+#     st.session_state.pendiente_crear_ticket = None
+
 
 user_input = st.chat_input("Escribe tu consulta aquí...")
 
@@ -411,7 +424,7 @@ if st.session_state.get("pendiente_crear_ticket"):
         with st.form(key="ticket_form_unico"):
 
             descripcion = st.text_area(
-                "Descripción del problema",
+                "Descripción del problema (puedes editarlo si lo consideras necesario)",
                 value=st.session_state.get("ticket_summary", "")
             )
 

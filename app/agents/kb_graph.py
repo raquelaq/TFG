@@ -103,7 +103,13 @@ async def kb_save_entry_node(state: KBState) -> KBState:
     try:
         with open(KB_PATH, "r", encoding="utf-8") as f:
             kb_data = json.load(f)
-    except Exception:
+            if not isinstance(kb_data, list):
+                kb_data = []
+    except json.JSONDecodeError:
+        print("❌ KB corrupta, se reinicia")
+        kb_data = []
+    except Exception as e:
+        print(f"❌ Error leyendo KB: {e}")
         kb_data = []
 
     new_entry = {
