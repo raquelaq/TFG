@@ -76,16 +76,16 @@ st.set_page_config(page_title="Asistente de soporte", page_icon="⚙️", layout
 
 if not st.session_state.logged_in:
 
-    st.title("🔐 Acceso al sistema")
+    st.title("Acceso al sistema")
     st.subheader("Selecciona tu tipo de acceso")
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("👤 Acceder como Usuario"):
+        if st.button("Acceder como Usuario"):
             st.session_state.selected_role = "user"
 
     with col2:
-        if st.button("🛠 Acceder como Técnico"):
+        if st.button("Acceder como Técnico"):
             st.session_state.selected_role = "tech"
 
     if st.session_state.get("selected_role"):
@@ -121,18 +121,16 @@ if not st.session_state.logged_in:
     st.stop()
 
 if st.session_state.role == "tech":
-    st.title("🛠 Panel Técnico – Gestión de la Base de Conocimiento")
+    st.title("Panel Técnico")
     st.markdown(
         "Aquí puedes añadir nuevas entradas a la base de conocimiento.\n\n"
-        "Cuando guardes, los datos se enviarán al **grafo KB de LangGraph**, "
-        "que se encarga de actualizar el fichero JSON y regenerar los embeddings."
     )
 
     st.write("---")
 
-    st.write("### ➕ Nueva entrada en la KB")
+    st.write("### Nueva entrada en la KB")
 
-    new_id = st.text_input("ID único de la incidencia", value=f"INC_{st.session_state.user_email}_1")
+    new_id = st.text_input("ID único de la incidencia. Escribir sin espacios, con guiones bajos", value=f"nombre_de_la_inicidenica")
     title = st.text_input("Título de la incidencia")
     description = st.text_area("Descripción del problema")
 
@@ -164,7 +162,7 @@ if st.session_state.role == "tech":
         value="Si el usuario no consigue resolver la incidencia tras seguir todos los pasos, devuelve solved=false para generar un ticket a soporte técnico."
     )
 
-    if st.button("💾 Guardar entrada en la KB"):
+    if st.button("Guardar entrada"):
         if not new_id or not title or not description:
             st.error("⚠️ ID, título y descripción son obligatorios.")
             st.stop()
@@ -198,7 +196,7 @@ if st.session_state.role == "tech":
         except Exception as e:
             st.error(f"❌ Error guardando la entrada: {e}")
 
-    if st.button("📘 Ver base de conocimiento"):
+    if st.button("Ver base de conocimiento"):
         from app.services.KnowledgeBaseFiltering import (
             KB_CORPUS_DATA,
             initialize_model_and_kb
@@ -209,7 +207,7 @@ if st.session_state.role == "tech":
         if not KB_CORPUS_DATA:
             st.warning("La base de conocimiento está vacía.")
         else:
-            st.subheader("📚 Base de conocimiento")
+            st.subheader("Base de conocimiento")
             st.caption(f"{len(KB_CORPUS_DATA)} incidencias registradas")
 
             for incident in KB_CORPUS_DATA:
@@ -227,7 +225,7 @@ if st.session_state.role == "tech":
                             st.markdown(f"- **Paso {i}:** {step.get('user_action', '')}")
 
     st.write("---")
-    if st.button("⏪ Cerrar sesión"):
+    if st.button("Cerrar sesión"):
         st.session_state.clear()
         st.rerun()
 
@@ -319,7 +317,7 @@ if st.sidebar.button("Cerrar sesión"):
 
 if st.sidebar.button("Reiniciar conversación"):
     st.session_state.graph_state = {}
-    st.session_state.chat_history = []  # 🔥 CLAVE
+    st.session_state.chat_history = []
     st.session_state.esperando_confirmacion = False
     st.session_state.pendiente_crear_ticket = None
 
@@ -333,19 +331,10 @@ if "modo_respuesta" not in st.session_state:
 
 modo = st.radio(
     "Selecciona el tipo de modelo a usar:",
-    ["IA Generativa", "Modelo ML (embeddings)"],
+    ["IA Generativa", "Modelo Híbrido (BM25 + embeddings)"],
     index=0
 )
 st.session_state.modo_respuesta = modo
-
-# if st.sidebar.button("Reiniciar conversación"):
-#     st.session_state.graph_state = {}
-#     st.session_state.chat_history.append({
-#         "role": "bot",
-#         "content": "Ok, empezamos de cero. ¿Qué incidencia tienes ahora?"
-#     })
-#     st.session_state.esperando_confirmacion = False
-#     st.session_state.pendiente_crear_ticket = None
 
 
 user_input = st.chat_input("Escribe tu consulta aquí...")
@@ -437,18 +426,29 @@ if st.session_state.get("pendiente_crear_ticket"):
 
             if submitted:
                 try:
+                    image_path = None
+
+                    if imagen is not None:
+                        temp_dir = "tmp_uploads"
+                        os.makedirs(temp_dir, exist_ok=True)
+
+                        image_path = os.path.join(temp_dir, imagen.name)
+
+                        with open(image_path, "wb") as f:
+                            f.write(imagen.getbuffer())
+
                     agent = TicketAgent(
                         [{"role": "user", "content": descripcion}],
                         user=st.session_state.user_email
                     )
 
                     ticket_result = asyncio.run(
-                        agent.create_ticket(image_path=None)
+                        agent.create_ticket(image_path=image_path)
                     )
 
                     st.session_state.chat_history.append({
                         "role": "bot",
-                        "content": "✅ Ticket creado correctamente.",
+                        "content": "Ticket creado correctamente.",
                         "url": ticket_result["url"]
                     })
 
@@ -463,24 +463,24 @@ if st.session_state.get("pendiente_crear_ticket"):
                     st.error(f"❌ Error enviando ticket a JIRA: {e}")
 
 
-if st.session_state.get("esperando_confirmacion"):
-    st.markdown("**¿El problema quedó resuelto?**")
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("Sí, se ha solucionado", key="btn_solved_hybrid"):
-            st.session_state.chat_history.append({
-                "role": "bot",
-                "content": "¡Perfecto! Me alegra que hayas podido resolver la incidencia. "
-                           "Si tienes cualquier otra duda, aquí estaré."
-            })
-            st.session_state.esperando_confirmacion = False
-
-    with col2:
-        if st.button("No, quiero crear un ticket", key="btn_not_solved_hybrid"):
-            st.session_state.chat_history.append({
-                "role": "bot",
-                "content": "De acuerdo, vamos a crear un ticket para que soporte técnico pueda revisarlo en detalle."
-            })
-            st.session_state.pendiente_crear_ticket = st.session_state.get("last_hybrid_query", "")
-            st.session_state.esperando_confirmacion = False
+# if st.session_state.get("esperando_confirmacion"):
+#     st.markdown("**¿El problema quedó resuelto?**")
+#     col1, col2 = st.columns(2)
+#
+#     with col1:
+#         if st.button("Sí, se ha solucionado", key="btn_solved_hybrid"):
+#             st.session_state.chat_history.append({
+#                 "role": "bot",
+#                 "content": "¡Perfecto! Me alegra que hayas podido resolver la incidencia. "
+#                            "Si tienes cualquier otra duda, aquí estaré."
+#             })
+#             st.session_state.esperando_confirmacion = False
+#
+#     with col2:
+#         if st.button("No, quiero crear un ticket", key="btn_not_solved_hybrid"):
+#             st.session_state.chat_history.append({
+#                 "role": "bot",
+#                 "content": "De acuerdo, vamos a crear un ticket para que soporte técnico pueda revisarlo en detalle."
+#             })
+#             st.session_state.pendiente_crear_ticket = st.session_state.get("last_hybrid_query", "")
+#             st.session_state.esperando_confirmacion = False

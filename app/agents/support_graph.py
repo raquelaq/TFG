@@ -203,7 +203,7 @@ async def hybrid_response_node(state: SupportState) -> Command:
     if not incidente:
         return Command(goto="Ticket", update={"output": "He encontrado coincidencia, pero no puedo cargar la guía.", "solved": False})
 
-    texto = f"📘 **{incidente.get('title', '(Sin título)')}**\n\n"
+    texto = f"**{incidente.get('title', '(Sin título)')}**\n\n"
 
     preguntas = incidente.get("questions_llm", [])
     pasos = incidente.get("resolution_guide_llm", {}).get("diagnostic_steps", [])
@@ -223,7 +223,7 @@ async def hybrid_response_node(state: SupportState) -> Command:
     else:
         texto += "⚠️ Esta incidencia no tiene pasos detallados.\n\n"
 
-    texto += "¿El problema quedó resuelto?"
+    #texto += "¿El problema quedó resuelto?"
 
     return Command(goto=END, update={"output": texto, "solved": True})
 
@@ -242,7 +242,7 @@ async def ticket_node(state: SupportState) -> Command:
 async def kb_manager_node(state: SupportState) -> Command:
     return Command(
         goto=END,
-        update={"output": "📘 Panel técnico.\n\nPuedes añadir/editar/eliminar entradas de la base de conocimiento.", "solved": True}
+        update={"output": "Panel técnico.\n\nPuedes añadir/editar/eliminar entradas de la base de conocimiento.", "solved": True}
     )
 
 def build_support_graph():

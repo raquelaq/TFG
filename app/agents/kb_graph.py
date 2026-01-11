@@ -49,7 +49,7 @@ async def kb_manager_node(state: KBState) -> KBState:
     return {
         "__output__": "KBManager",
         "output": (
-            "📘 Estás en el **panel técnico**.\n\n"
+            "Estás en el **panel técnico**.\n\n"
             "Puedes decirme por ejemplo:\n"
             "- `Añadir entrada`\n"
             "(Más adelante: `Editar entrada`, `Eliminar entrada`...)\n"

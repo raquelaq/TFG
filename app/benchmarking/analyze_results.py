@@ -40,7 +40,6 @@ def analyze(mode):
 
     accuracy = (cm["TP"] + cm["TN"]) / total
 
-    # Métricas derivadas (opcional pero muy útil)
     fpr = cm["FP"] / (cm["FP"] + cm["TN"]) if (cm["FP"] + cm["TN"]) > 0 else 0
     fnr = cm["FN"] / (cm["FN"] + cm["TP"]) if (cm["FN"] + cm["TP"]) > 0 else 0
 

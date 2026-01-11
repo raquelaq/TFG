@@ -5,13 +5,18 @@
       "password": "1234",
       "role": "user"
     },{
-      "email": "raquel",
+      "email": "raquel@empresa.com",
       "password": "raquel",
       "role": "user"
     },
     {
       "email": "tecnico1@empresa.com",
       "password": "abcd",
+      "role": "tech"
+    },
+    {
+      "email": "tecnico2@empresa.com",
+      "password": "ulpgc",
       "role": "tech"
     }
   ]
