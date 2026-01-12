@@ -39,7 +39,6 @@ async def run_query(query: str, mode: str):
 
         latency_ms = (t1 - t0) * 1000
 
-        # Caso 1: el grafo ya devuelve dict estructurado (ideal)
         if isinstance(raw_result, dict):
             solved = raw_result.get("solved", False)
             ticket = raw_result.get("action") == "ticket"
@@ -54,7 +53,6 @@ async def run_query(query: str, mode: str):
                 "response": output
             }
 
-        # Caso 2: el grafo devuelve texto (modo generativo)
         parsed = extract_json(str(raw_result))
 
         if parsed:
@@ -113,7 +111,7 @@ def main():
         for r in RESULTS:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-    print("\n✔ Benchmark completado. Resultados guardados.")
+    print("\nBenchmark completado. Resultados guardados.")
 
 
 if __name__ == "__main__":

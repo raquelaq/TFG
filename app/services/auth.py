@@ -11,10 +11,10 @@ def load_users():
             data = json.load(f)
             return data.get("users", [])
     except json.JSONDecodeError:
-        print("❌ users.json corrupto")
+        print("users.json corrupto")
         return []
     except Exception as e:
-        print(f"❌ Error cargando usuarios: {e}")
+        print(f"Error cargando usuarios: {e}")
         return []
 
 

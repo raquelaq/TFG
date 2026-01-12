@@ -7,8 +7,8 @@ from ..config import JIRA_AUTH_HEADER
 
 BASE_URL = "https://ralmeidaquesada-1765035802101.atlassian.net"
 
-SERVICE_DESK_ID = "1"          # 👈 fijo según tu portal
-REQUEST_TYPE_ID = "1"          # 👈 pon aquí el ID real de “Incidente”
+SERVICE_DESK_ID = "1"
+REQUEST_TYPE_ID = "1"
 
 def attach_file_to_ticket(issue_key: str, file_path: str):
     filename = os.path.basename(file_path)

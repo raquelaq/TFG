@@ -56,7 +56,7 @@ def initialize_hybrid_search():
             if not isinstance(kb, list):
                 kb = []
     except json.JSONDecodeError:
-        print("❌ KB corrupta en hybrid_search")
+        print("KB corrupta en hybrid_search")
         kb = []
 
     kb_filtrada = [
@@ -120,7 +120,7 @@ def is_out_of_domain(query: str) -> bool:
 
 
 def buscar_hibrido(query: str, alpha: float = 0.25, top_k: int = 3):
-    initialize_hybrid_search()  # 🔥 AQUÍ
+    initialize_hybrid_search()
 
     query_norm = normalize_query(query)
 

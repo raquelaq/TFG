@@ -6,7 +6,6 @@ from pathlib import Path
 from configparser import ConfigParser
 import json
 
-#if os.path.exists('config.ini'):
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 APP_DIR = PROJECT_ROOT / "app"
@@ -16,10 +15,8 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.ini')
 
 if os.path.exists(CONFIG_PATH):
     config = ConfigParser()
-    #config.read("config.ini", encoding='utf-8')
     config.read(CONFIG_PATH, encoding='utf-8')
 
-    #DATA_STORE = config.get("GENERAL", "DATA_STORE")
     GOOGLE_CLIENT_EMAIL = config.get("GENERAL", "GOOGLE_CLIENT_EMAIL")
     GOOGLE_PRIVATE_KEY = config.get("GENERAL", "GOOGLE_PRIVATE_KEY").replace('\\n', '\n')
     AUDIENCE = config.get("GENERAL", "AUDIENCE")
@@ -28,7 +25,6 @@ if os.path.exists(CONFIG_PATH):
     JIRA_AUTH_HEADER = config.get("GENERAL", "JIRA_AUTH_HEADER")  
 
 else:
-    #DATA_STORE = os.getenv("DATA_STORE")
     GOOGLE_CLIENT_EMAIL = os.getenv("GOOGLE_CLIENT_EMAIL")
     GOOGLE_PRIVATE_KEY = os.getenv("GOOGLE_PRIVATE_KEY").replace('\\n', '\n')
     AUDIENCE = os.getenv("AUDIENCE")
@@ -42,7 +38,7 @@ if os.path.exists("api_keys.json"):
         with open("api_keys.json", "r", encoding="utf-8") as f:
             API_KEYS = json.load(f)
     except json.JSONDecodeError:
-        print("❌ api_keys.json corrupto")
+        print("api_keys.json corrupto")
         API_KEYS = {}
 else:
     API_KEYS = json.loads(os.getenv("API_KEYS", "{}"))

@@ -2,18 +2,13 @@ import json
 from statistics import mean
 from collections import defaultdict
 
-# --------------------
-# Cargar resultados
-# --------------------
 results = []
 
 with open("benchmark_results.jsonl", encoding="utf-8") as f:
     for line in f:
         results.append(json.loads(line))
 
-# --------------------
-# Análisis por modo
-# --------------------
+
 def analyze(mode):
     subset = [r for r in results if r["mode"] == mode]
     total = len(subset)
@@ -22,7 +17,6 @@ def analyze(mode):
     error_rate = sum(r["error"] for r in subset) / total
     ticket_rate = sum(r["ticket"] for r in subset) / total
 
-    # Matriz de confusión
     cm = {"TP": 0, "FP": 0, "FN": 0, "TN": 0}
 
     for r in subset:
@@ -57,14 +51,14 @@ def analyze(mode):
 for mode in ["generative", "hybrid"]:
     stats = analyze(mode)
 
-    print(f"\n📊 RESULTADOS {mode.upper()}")
+    print(f"\nRESULTADOS {mode.upper()}")
     print(f"- Latencia media: {stats['latency_ms']:.2f} ms")
     print(f"- Precisión (expected vs output): {stats['accuracy']*100:.1f}%")
     print(f"- Ticket rate: {stats['ticket_rate']*100:.1f}%")
     print(f"- Error rate: {stats['error_rate']*100:.1f}%")
 
     cm = stats["confusion_matrix"]
-    print("🔎 Matriz de confusión:")
+    print("Matriz de confusión:")
     print(f"  TP: {cm['TP']} | FP: {cm['FP']} | FN: {cm['FN']} | TN: {cm['TN']}")
 
     print(f"- False Positive Rate (FPR): {stats['fpr']*100:.1f}%")

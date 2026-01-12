@@ -44,7 +44,7 @@ async def call_gemini_llm(conversation_history, tools=None):
 
     except Exception as e:
 
-        print("❌ Gemini error:", repr(e))
+        print("Gemini error:", repr(e))
 
         return {
             "Response": (

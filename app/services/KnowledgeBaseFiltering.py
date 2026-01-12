@@ -58,7 +58,7 @@ def load_embeddings_from_cache(cache_file: str) -> Optional[Dict[str, torch.Tens
 
 def save_embeddings_to_cache(embeddings: Dict[str, torch.Tensor], cache_file: str):
     try:
-        os.makedirs(os.path.dirname(cache_file), exist_ok=True)  # 👈 CLAVE
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
         serializable_embeddings = {k: v.tolist() for k, v in embeddings.items()}
         with open(cache_file, 'w', encoding='utf-8') as f:
             json.dump(serializable_embeddings, f, indent=4)
@@ -217,7 +217,7 @@ def get_relevant_incidents_weighted_context(
 def rebuild_embeddings(cache_file: str = EMBEDDING_CACHE_FILE) -> None:
     global model, KB_CORPUS_EMBEDDINGS, KB_CORPUS_DATA
 
-    print("🔁 Rebuilding Knowledge Base embeddings...")
+    print("Rebuilding Knowledge Base embeddings...")
 
     if model is None:
         try:
@@ -263,6 +263,6 @@ def rebuild_embeddings(cache_file: str = EMBEDDING_CACHE_FILE) -> None:
     KB_CORPUS_DATA = corpus_data_ordered
 
     print(
-        f"✅ Rebuild completado: {len(KB_CORPUS_DATA)} entradas, "
+        f"Rebuild completado: {len(KB_CORPUS_DATA)} entradas, "
         f"{time.time() - start:.2f} segundos."
     )

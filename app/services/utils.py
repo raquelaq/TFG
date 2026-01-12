@@ -1,11 +1,7 @@
 import re
-import json
-import os
-#from google.generativeai import genai
 from ..config import *
-from ..services.gemini import *
 
-from fastapi import Request, Header, HTTPException, Depends
+from fastapi import Request, Header, HTTPException
 
 import jwt
 import requests
@@ -121,12 +117,12 @@ def verify_google_chat_token(token: str, expected_audience: list[str]):
         aud = unverified_payload.get("aud")
 
         if aud not in expected_audience:
-            print(f"❌ Audience '{aud}' not in expected list")
+            print(f"Audience '{aud}' not in expected list")
             return None
 
         certs = get_google_chat_certificates()
         if kid not in certs:
-            print(f"❌ Certificate with key ID {kid} not found")
+            print(f"Certificate with key ID {kid} not found")
             return None
 
         cert_str = certs[kid]
@@ -143,9 +139,9 @@ def verify_google_chat_token(token: str, expected_audience: list[str]):
         return payload
 
     except jwt.ExpiredSignatureError:
-        print("❌ Token expired")
+        print("Token expired")
     except jwt.InvalidTokenError as e:
-        print(f"❌ Invalid token: {e}")
+        print(f"Invalid token: {e}")
     except Exception as ex:
-        print(f"❌ Error verifying token: {ex}")
+        print(f"Error verifying token: {ex}")
     return None
