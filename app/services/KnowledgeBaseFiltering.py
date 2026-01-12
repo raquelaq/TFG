@@ -19,8 +19,6 @@ KB_CORPUS_EMBEDDINGS: Optional[torch.Tensor] = None
 KB_CORPUS_DATA: Optional[List[Dict[str, Any]]] = None
 
 conversation_history_embeddings: Dict[str, List[torch.Tensor]] = {}
-conversation_history_texts: Dict[str, List[str]] = {}
-_chat_histories_in_memory: Dict[str, List[Dict[str, Any]]] = {}
 
 _model_initialized = False
 

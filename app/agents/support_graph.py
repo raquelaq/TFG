@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.types import Command
 from langsmith import traceable
 from datetime import datetime
+from typing import TypedDict, List, Dict, Any
 import json
 
 from app.config import DATA_DIR
@@ -10,7 +11,7 @@ from app.services.gemini import call_gemini_llm
 from app.services.utils import get_conversation, save_conversation, convert_markdown_for_google_chat
 from app.services.KnowledgeBaseFiltering import get_relevant_incidents_weighted_context
 from app.services.hybrid_search import buscar_hibrido
-from app.services.KnowledgeBaseFiltering import initialize_model_and_kb
+from app.services.KnowledgeBaseFiltering import initialize_model_and_kb, rebuild_embeddings
 from app.services.hybrid_search import get_kb_item_by_id
 
 
@@ -22,16 +23,28 @@ class SupportState(TypedDict, total=False):
     user_email: str
     role: Literal["user", "tech"]
     response_mode: Literal["generative", "hybrid"]
+
+    id: str
+    title: str
+    description_problem: str
+    symptoms: list
+    resolution_guide_llm: Dict[str, Any]
+    escalation_criteria: str
+    keywords_tags: list
+
     solved: Optional[bool]
     output: Optional[str]
-    #kb_answer: str
     action: Optional[Literal["ticket", "none"]]
+
+@traceable(name="RouteByRole")
+async def route_by_role(state: SupportState) -> Command:
+    if state.get("role") == "tech":
+        return Command(goto="KB_SaveEntry")
+    return Command(goto="RouteByResponseMode")
 
 @traceable(name="RouteByResponseMode")
 async def route_by_response_mode(state: SupportState) -> Command:
     state["trace"] = f"routing:{state.get('response_mode')}"
-    if state.get("role") == "tech":
-        return Command(goto="KBManager")
 
     mode = state.get("response_mode", "generative")
     return Command(goto="HybridResponse" if mode == "hybrid" else "GenerativeResponse")
@@ -223,7 +236,6 @@ async def hybrid_response_node(state: SupportState) -> Command:
     else:
         texto += "⚠️ Esta incidencia no tiene pasos detallados.\n\n"
 
-    #texto += "¿El problema quedó resuelto?"
 
     return Command(goto=END, update={"output": texto, "solved": True})
 
@@ -238,25 +250,54 @@ async def ticket_node(state: SupportState) -> Command:
         }
     )
 
-@traceable(name="KBManager")
-async def kb_manager_node(state: SupportState) -> Command:
+@traceable(name="KB_SaveEntry")
+async def kb_save_entry_node(state: SupportState) -> Command:
+    from app.services.KnowledgeBaseFiltering import rebuild_embeddings
+    import json, os
+
+    KB_PATH = DATA_DIR / "KnowledgeBase.json"
+    KB_PATH.parent.mkdir(exist_ok=True)
+
+    if KB_PATH.exists():
+        with open(KB_PATH, "r", encoding="utf-8") as f:
+            kb = json.load(f)
+    else:
+        kb = []
+
+    kb.append({
+        "id": state["id"],
+        "title": state["title"],
+        "description_problem": state["description_problem"],
+        "symptoms": state.get("symptoms", []),
+        "resolution_guide_llm": state.get("resolution_guide_llm", {}),
+        "escalation_criteria": state.get("escalation_criteria", ""),
+        "keywords_tags": state.get("keywords_tags", [])
+    })
+
+    with open(KB_PATH, "w", encoding="utf-8") as f:
+        json.dump(kb, f, indent=4, ensure_ascii=False)
+
+    rebuild_embeddings()
+
     return Command(
         goto=END,
-        update={"output": "Panel técnico.\n\nPuedes añadir/editar/eliminar entradas de la base de conocimiento.", "solved": True}
+        update={"output": f"✅ Entrada '{state['title']}' añadida correctamente."}
     )
+
 
 def build_support_graph():
     initialize_model_and_kb(str(DATA_DIR / "kb_embeddings.json"))
 
     graph = StateGraph(SupportState)
 
+    graph.add_node("RouteByRole", route_by_role)
     graph.add_node("RouteByResponseMode", route_by_response_mode)
     graph.add_node("GenerativeResponse", generative_agent_node)
     graph.add_node("HybridResponse", hybrid_response_node)
     graph.add_node("Ticket", ticket_node)
-    graph.add_node("KBManager", kb_manager_node)
+    graph.add_node("KB_SaveEntry", kb_save_entry_node)
 
-    graph.set_entry_point("RouteByResponseMode")
+    graph.set_entry_point("RouteByRole")
 
     return graph.compile()
 

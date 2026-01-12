@@ -33,9 +33,6 @@ def attach_file_to_ticket(issue_key: str, file_path: str):
             files=files
         )
 
-    print("ATTACH STATUS:", resp.status_code)
-    print("ATTACH RESPONSE:", resp.text)
-
     resp.raise_for_status()
     return resp.json()
 

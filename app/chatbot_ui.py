@@ -9,12 +9,11 @@ import streamlit as st
 import asyncio
 import nest_asyncio
 nest_asyncio.apply()
-import requests
 from langchain_core.runnables import RunnableConfig
 
 from app.config import DATA_DIR
 from app.agents.support_graph import build_support_graph
-from app.agents.kb_graph import build_kb_graph
+#from app.agents.kb_graph import build_kb_graph
 from app.services.KnowledgeBaseFiltering import initialize_model_and_kb
 from app.services.auth import authenticate
 from app.agents.ticket_agent import TicketAgent
@@ -26,14 +25,9 @@ if sys.platform.startswith("win"):
 def load_support_graph():
     return build_support_graph()
 
-@st.cache_resource
-def load_kb_graph():
-    return build_kb_graph()
-
 SUPPORT_GRAPH = load_support_graph()
-KB_GRAPH = load_kb_graph()
 
-async def process_message(user_message: str, prev_state: dict, active_graph) -> dict:
+async def process_message(user_message: str, prev_state: dict) -> dict:
     state = {
         **prev_state,
         "user_message": user_message,
@@ -46,7 +40,7 @@ async def process_message(user_message: str, prev_state: dict, active_graph) -> 
         )
     }
 
-    result = await active_graph.ainvoke(
+    result = await SUPPORT_GRAPH.ainvoke(
         state,
         config=RunnableConfig(
             run_name="Chat soporte",
@@ -65,11 +59,8 @@ if "inicio" not in st.session_state:
 
     st.session_state.graph_state = {}
     st.session_state.chat_history = []
-    st.session_state.active_graph = None
 
-    st.session_state.last_hybrid_query = ""
     st.session_state.pendiente_crear_ticket = None
-    st.session_state.esperando_confirmacion = False
     st.session_state.ticket_summary = ""
 
 st.set_page_config(page_title="Asistente de soporte", page_icon="⚙️", layout="centered")
@@ -111,11 +102,12 @@ if not st.session_state.logged_in:
             st.session_state.user_email = user["email"]
             st.session_state.role = user["role"]
 
-            if user["role"] == "user":
-                st.session_state.active_graph = SUPPORT_GRAPH
-            else:
-                st.session_state.active_graph = KB_GRAPH
-                initialize_model_and_kb(str(DATA_DIR / "kb_embeddings.json"), force_reload=True)
+            if user["role"] == "tech":
+                initialize_model_and_kb(
+                    str(DATA_DIR / "kb_embeddings.json"),
+                    force_reload=True
+                )
+
             st.rerun()
 
     st.stop()
@@ -168,6 +160,11 @@ if st.session_state.role == "tech":
             st.stop()
 
         kb_state = {
+            "role": "tech",
+            "user_email": st.session_state.user_email,
+
+            "user_message": "__kb_operation__",
+
             "id": new_id,
             "title": title,
             "description_problem": description,
@@ -182,7 +179,7 @@ if st.session_state.role == "tech":
 
         try:
             out = asyncio.run(
-                KB_GRAPH.ainvoke(
+                SUPPORT_GRAPH.ainvoke(
                     kb_state,
                     config=RunnableConfig(
                         run_name="KB Manager",
@@ -347,8 +344,7 @@ if user_input:
         bot_state = asyncio.run(
             process_message(
                 user_input,
-                st.session_state.graph_state,
-                st.session_state.active_graph
+                st.session_state.graph_state
             )
         )
 
@@ -461,26 +457,3 @@ if st.session_state.get("pendiente_crear_ticket"):
 
                 except Exception as e:
                     st.error(f"❌ Error enviando ticket a JIRA: {e}")
-
-
-# if st.session_state.get("esperando_confirmacion"):
-#     st.markdown("**¿El problema quedó resuelto?**")
-#     col1, col2 = st.columns(2)
-#
-#     with col1:
-#         if st.button("Sí, se ha solucionado", key="btn_solved_hybrid"):
-#             st.session_state.chat_history.append({
-#                 "role": "bot",
-#                 "content": "¡Perfecto! Me alegra que hayas podido resolver la incidencia. "
-#                            "Si tienes cualquier otra duda, aquí estaré."
-#             })
-#             st.session_state.esperando_confirmacion = False
-#
-#     with col2:
-#         if st.button("No, quiero crear un ticket", key="btn_not_solved_hybrid"):
-#             st.session_state.chat_history.append({
-#                 "role": "bot",
-#                 "content": "De acuerdo, vamos a crear un ticket para que soporte técnico pueda revisarlo en detalle."
-#             })
-#             st.session_state.pendiente_crear_ticket = st.session_state.get("last_hybrid_query", "")
-#             st.session_state.esperando_confirmacion = False

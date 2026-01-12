@@ -9,6 +9,8 @@ from ..agents.ticket_agent import TicketAgent
 from app.agents.support_graph import build_support_graph
 from ..services.KnowledgeBaseFiltering import *
 
+#### AHORA MISMO NO SE USA, ES UN BACKEND PARA GOOGLE CHAT
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 compiled_graph = build_support_graph()
@@ -143,7 +145,6 @@ async def respond_message(data):
         chat_id = data.get("space", {}).get("name")
         user_email = data.get("message", {}).get("sender").get("email")
 
-        # --- Semantic Filtering Step ---
         start_filter = time.time()
         print(f"Filtering relevant incidents for query: '{user_message}' (Chat ID: {chat_id}, User Email: {user_email})")
         relevant_incidents = get_relevant_incidents_weighted_context(
