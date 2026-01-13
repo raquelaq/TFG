@@ -106,8 +106,9 @@ Para ejecutar la API localmente:
 ```bash
 streamlit run app/chatbot_ui.py
 ```
-
+```bash
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
 ## Arquitectura del grafo
 
